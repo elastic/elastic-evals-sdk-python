@@ -6,6 +6,7 @@ This example demonstrates how to:
 2. Run RAG metrics evaluators (Precision@K, Recall@K, F1@K)
 3. Run groundedness evaluator (LLM-based)
 4. Run trace-based evaluators (latency, tokens, tool calls)
+5. Export evaluation results as Phoenix experiments
 
 ## Prerequisites
 
@@ -64,9 +65,16 @@ export PHOENIX_BASE_URL="https://app.phoenix.arize.com/s/your-space"
 
 ### Trace-based Evaluators (Optional)
 
+Trace-based evaluators (latency, tokens, tool calls) require:
+1. An OpenTelemetry collector (e.g., [EDOT Collector](https://www.elastic.co/docs/reference/edot-collector)) to receive traces
+2. Elasticsearch with APM data for querying traces
+
 ```bash
-# Elasticsearch for trace data
+# Elasticsearch URL for querying trace data
 TRACE_ES_URL=http://localhost:9200
+
+# OTLP endpoint (where your OTel collector receives traces)
+ELASTIC_EVALS_TRACING_ENDPOINT=http://localhost:4318/v1/traces
 ```
 
 ### Multi-Exporter Tracing (Optional)

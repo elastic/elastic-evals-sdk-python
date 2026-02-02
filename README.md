@@ -142,7 +142,8 @@ Results are stored in `RanExperiment`.
 | `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name | No | `elastic-evals` |
 | `ELASTIC_EVALS_TRACING_TARGETS` | Comma-separated exporters for multi-export | No | - |
 | `ELASTIC_EVALS_TRACING_EXPORTERS` | JSON array of exporter configs | No | - |
-| `PHOENIX_COLLECTOR_ENDPOINT` | Phoenix server URL | No | `http://localhost:6006` |
+| `PHOENIX_BASE_URL` | Phoenix REST API URL (for datasets/experiments) | No | `http://localhost:6006` |
+| `PHOENIX_COLLECTOR_ENDPOINT` | Phoenix OTLP endpoint (for traces) | No | `http://localhost:6006` |
 | `PHOENIX_PROJECT_NAME` | Phoenix project name | No | - |
 | `PHOENIX_API_KEY` | Phoenix Cloud API key | No | - |
 | `ELASTIC_EVALS_PHOENIX_USE_GRPC` | Use gRPC for Phoenix (`true`/`false`) | No | `false` |
@@ -310,8 +311,10 @@ The Phoenix Experiments UI will show all task outputs and evaluator scores.
 - **Latency** (overall and span-level)
 - **Tool call counts**
 
-Trace-based evaluators require traces exported via OTLP and access to trace data in ES
-(set `TRACE_ES_URL`).
+Trace-based evaluators require:
+1. An OpenTelemetry collector (e.g., [EDOT Collector](https://www.elastic.co/docs/reference/edot-collector)) running to receive traces
+2. Tracing enabled with `ELASTIC_EVALS_TRACING_ENDPOINT` pointing to the collector
+3. Elasticsearch with APM data accessible via `TRACE_ES_URL`
 
 ## Elasticsearch export
 
