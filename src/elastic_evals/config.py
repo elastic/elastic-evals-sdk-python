@@ -8,9 +8,9 @@ import os
 import uuid
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from elastic_evals.tracing import TracingConfig
+from elastic_evals.tracing import ExporterConfig, TracingConfig
 from elastic_evals.utils.logging import setup_logging
 
 
@@ -39,6 +39,102 @@ def _parse_bool(value: str | None, *, name: str, default: bool) -> bool:
     raise ValueError(f"{name} must be a boolean value")
 
 
+def _parse_tracing_exporters() -> list[ExporterConfig]:
+    """Parse tracing exporter configuration from environment variables.
+
+    Supports multiple configuration formats:
+    1. JSON array: ELASTIC_EVALS_TRACING_EXPORTERS='[{"type":"otlp",...},{"type":"phoenix",...}]'
+    2. Comma-separated targets: ELASTIC_EVALS_TRACING_TARGETS=otlp,phoenix
+    3. Legacy single exporter: ELASTIC_EVALS_TRACING_EXPORTER=otlp
+
+    Phoenix-specific env vars (used when "phoenix" is in targets):
+    - PHOENIX_COLLECTOR_ENDPOINT: Phoenix server URL (default: http://localhost:6006)
+    - PHOENIX_PROJECT_NAME: Project name in Phoenix
+    - PHOENIX_API_KEY: API key for Phoenix Cloud
+    - ELASTIC_EVALS_PHOENIX_USE_GRPC: Use gRPC transport (default: false)
+    """
+    # Option 1: Full JSON configuration
+    exporters_json = os.environ.get("ELASTIC_EVALS_TRACING_EXPORTERS")
+    if exporters_json:
+        try:
+            exporters_data = json.loads(exporters_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("ELASTIC_EVALS_TRACING_EXPORTERS must be valid JSON") from exc
+
+        if not isinstance(exporters_data, list):
+            raise ValueError("ELASTIC_EVALS_TRACING_EXPORTERS must be a JSON array")
+
+        try:
+            return [ExporterConfig(**exp) for exp in exporters_data]
+        except TypeError as exc:
+            raise ValueError(
+                "ELASTIC_EVALS_TRACING_EXPORTERS items must be objects, not primitives"
+            ) from exc
+        except ValidationError as exc:
+            raise ValueError(
+                f"Invalid exporter config in ELASTIC_EVALS_TRACING_EXPORTERS: {exc.errors()[0]['msg']}"
+            ) from exc
+
+    # Option 2: Comma-separated targets (simplified)
+    targets = os.environ.get("ELASTIC_EVALS_TRACING_TARGETS")
+    if targets:
+        exporters = []
+        for target in targets.split(","):
+            target = target.strip().lower()
+            if target == "phoenix":
+                exporters.append(_create_phoenix_exporter_config())
+            elif target == "otlp":
+                exporters.append(_create_otlp_exporter_config())
+            elif target == "console":
+                exporters.append(ExporterConfig(type="console"))
+            elif target:
+                raise ValueError(
+                    f"Unknown tracing target '{target}'. "
+                    "Valid targets: otlp, phoenix, console"
+                )
+        return exporters
+
+    # Option 3: Legacy single exporter
+    exporter = os.environ.get("ELASTIC_EVALS_TRACING_EXPORTER", "otlp")
+    if exporter == "none":
+        return []
+    if exporter == "phoenix":
+        return [_create_phoenix_exporter_config()]
+    if exporter == "otlp":
+        return [_create_otlp_exporter_config()]
+    if exporter == "console":
+        return [ExporterConfig(type="console")]
+
+    raise ValueError(
+        "ELASTIC_EVALS_TRACING_EXPORTER must be one of otlp, phoenix, console, none"
+    )
+
+
+def _create_phoenix_exporter_config() -> ExporterConfig:
+    """Create Phoenix exporter config from environment variables."""
+    return ExporterConfig(
+        type="phoenix",
+        endpoint=os.environ.get("PHOENIX_COLLECTOR_ENDPOINT", "http://localhost:6006"),
+        project_name=os.environ.get("PHOENIX_PROJECT_NAME"),
+        api_key=os.environ.get("PHOENIX_API_KEY"),
+        use_grpc=_parse_bool(
+            os.environ.get("ELASTIC_EVALS_PHOENIX_USE_GRPC"),
+            name="ELASTIC_EVALS_PHOENIX_USE_GRPC",
+            default=False,
+        ),
+    )
+
+
+def _create_otlp_exporter_config() -> ExporterConfig:
+    """Create OTLP exporter config from environment variables."""
+    return ExporterConfig(
+        type="otlp",
+        endpoint=os.environ.get(
+            "ELASTIC_EVALS_TRACING_ENDPOINT", "http://localhost:4318/v1/traces"
+        ),
+    )
+
+
 class ElasticEvalsConfig(BaseModel):
     run_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     repetitions: int = 3
@@ -53,6 +149,9 @@ class ElasticEvalsConfig(BaseModel):
     trace_es_url: str | None = None
 
     tracing: TracingConfig = Field(default_factory=TracingConfig)
+
+    # Phoenix experiment export
+    phoenix_experiment_export: bool = False
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     model: dict[str, Any] | None = None
@@ -85,22 +184,26 @@ class ElasticEvalsConfig(BaseModel):
             except json.JSONDecodeError as exc:
                 raise ValueError("ELASTIC_EVALS_MODEL must be valid JSON") from exc
 
-        exporter = os.environ.get("ELASTIC_EVALS_TRACING_EXPORTER", "otlp")
-        if exporter not in {"otlp", "console", "none"}:
-            raise ValueError("ELASTIC_EVALS_TRACING_EXPORTER must be one of otlp, console, none")
+        # Parse multi-exporter tracing configuration
+        tracing_enabled = _parse_bool(
+            os.environ.get("ELASTIC_EVALS_TRACING_ENABLED"),
+            name="ELASTIC_EVALS_TRACING_ENABLED",
+            default=True,
+        )
+        exporters = _parse_tracing_exporters() if tracing_enabled else []
 
         tracing = TracingConfig(
-            enabled=_parse_bool(
-                os.environ.get("ELASTIC_EVALS_TRACING_ENABLED"),
-                name="ELASTIC_EVALS_TRACING_ENABLED",
-                default=True,
-            ),
-            exporter=cast(Literal["otlp", "console", "none"], exporter),
-            endpoint=os.environ.get(
-                "ELASTIC_EVALS_TRACING_ENDPOINT", "http://localhost:4318/v1/traces"
-            ),
+            enabled=tracing_enabled,
+            exporters=exporters,
             service_name=os.environ.get("ELASTIC_EVALS_TRACING_SERVICE_NAME", "elastic-evals"),
             run_id=run_id,
+        )
+
+        # Phoenix experiment export
+        phoenix_experiment_export = _parse_bool(
+            os.environ.get("ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT"),
+            name="ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT",
+            default=False,
         )
 
         return cls(
@@ -114,6 +217,7 @@ class ElasticEvalsConfig(BaseModel):
             evaluations_es_url=evaluations_es_url,
             trace_es_url=trace_es_url,
             tracing=tracing,
+            phoenix_experiment_export=phoenix_experiment_export,
             log_level=cast(Literal["DEBUG", "INFO", "WARNING", "ERROR"], log_level),
             model=model,
         )

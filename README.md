@@ -25,10 +25,20 @@ to a Python-first workflow.
 pip install elastic-evals
 ```
 
+### With Phoenix support
+
+To use Arize Phoenix for trace export or dataset loading:
+
+```bash
+pip install elastic-evals[phoenix]
+```
+
 ### Using uv (recommended)
 
 ```bash
 uv add elastic-evals
+# With Phoenix support:
+uv add elastic-evals[phoenix]
 ```
 
 ### From source
@@ -127,12 +137,164 @@ Results are stored in `RanExperiment`.
 | `ELASTIC_EVALS_LOG_LEVEL` | Log level | No | `INFO` |
 | `ELASTIC_EVALS_MODEL` | JSON model metadata override | No | - |
 | `ELASTIC_EVALS_TRACING_ENABLED` | Enable tracing (`true`/`false`) | No | `true` |
-| `ELASTIC_EVALS_TRACING_EXPORTER` | Tracing exporter (`otlp`, `console`, `none`) | No | `otlp` |
+| `ELASTIC_EVALS_TRACING_EXPORTER` | Tracing exporter (`otlp`, `phoenix`, `console`, `none`) | No | `otlp` |
 | `ELASTIC_EVALS_TRACING_ENDPOINT` | OTLP/HTTP endpoint | No | `http://localhost:4318/v1/traces` |
 | `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name | No | `elastic-evals` |
+| `ELASTIC_EVALS_TRACING_TARGETS` | Comma-separated exporters for multi-export | No | - |
+| `ELASTIC_EVALS_TRACING_EXPORTERS` | JSON array of exporter configs | No | - |
+| `PHOENIX_BASE_URL` | Phoenix REST API URL (for datasets/experiments) | No | `http://localhost:6006` |
+| `PHOENIX_COLLECTOR_ENDPOINT` | Phoenix OTLP endpoint (for traces) | No | `http://localhost:6006` |
+| `PHOENIX_PROJECT_NAME` | Phoenix project name | No | - |
+| `PHOENIX_API_KEY` | Phoenix Cloud API key | No | - |
+| `ELASTIC_EVALS_PHOENIX_USE_GRPC` | Use gRPC for Phoenix (`true`/`false`) | No | `false` |
+| `ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT` | Export experiments to Phoenix (`true`/`false`) | No | `false` |
 | `SELECTED_EVALUATORS` | Comma-separated evaluator names | No | - |
 | `RAG_EVAL_K` | Override RAG K | No | - |
 | `INDEX_FOCUSED_RAG_EVAL` | Restrict to ground-truth indices (`true`) | No | - |
+
+## Multi-exporter tracing
+
+Send traces to multiple destinations simultaneously (e.g., both Elasticsearch APM and Arize Phoenix).
+
+### Using environment variables
+
+```bash
+# Option 1: Comma-separated targets (simple)
+export ELASTIC_EVALS_TRACING_TARGETS=otlp,phoenix
+export ELASTIC_EVALS_TRACING_ENDPOINT=http://localhost:4318
+export PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006
+export PHOENIX_PROJECT_NAME=my-evals
+
+# Option 2: Full JSON configuration (flexible)
+export ELASTIC_EVALS_TRACING_EXPORTERS='[
+  {"type":"otlp","endpoint":"http://localhost:4318"},
+  {"type":"phoenix","endpoint":"http://localhost:6006","project_name":"my-evals"}
+]'
+```
+
+### Using Python code
+
+```python
+from elastic_evals.tracing import TracingConfig, ExporterConfig, init_tracing
+
+config = TracingConfig(
+    exporters=[
+        ExporterConfig(type="otlp", endpoint="http://localhost:4318"),
+        ExporterConfig(
+            type="phoenix",
+            endpoint="http://localhost:6006",
+            project_name="my-evals",
+            api_key="your-api-key",  # Optional, for Phoenix Cloud
+        ),
+    ],
+    service_name="elastic-evals",
+)
+init_tracing(config)
+```
+
+### Phoenix Cloud
+
+For Phoenix Cloud, set your API key and endpoint:
+
+```bash
+export PHOENIX_COLLECTOR_ENDPOINT=https://app.phoenix.arize.com/s/your-space
+export PHOENIX_API_KEY=your-api-key
+export ELASTIC_EVALS_TRACING_EXPORTER=phoenix
+```
+
+## Loading datasets from Phoenix
+
+Load datasets directly from Arize Phoenix for use in evaluations.
+
+### Installation
+
+```bash
+pip install elastic-evals[phoenix]
+```
+
+### Using environment variables
+
+```bash
+export PHOENIX_BASE_URL=http://localhost:6006
+export PHOENIX_API_KEY=your-api-key  # Optional, for Phoenix Cloud
+```
+
+### Loading datasets
+
+```python
+from elastic_evals.datasets import load_dataset_from_phoenix, list_phoenix_datasets
+
+# List available datasets
+datasets = list_phoenix_datasets()
+for ds in datasets:
+    print(f"{ds['name']}: {ds['example_count']} examples")
+
+# Load a specific dataset
+dataset = load_dataset_from_phoenix("customer-support-qa")
+
+# Use in evaluation
+result = await client.run_experiment(
+    dataset=dataset,
+    task=my_task,
+    evaluators=my_evaluators,
+)
+```
+
+### With custom configuration
+
+```python
+from elastic_evals.datasets import load_dataset_from_phoenix, PhoenixDatasetConfig
+
+config = PhoenixDatasetConfig(
+    base_url="https://app.phoenix.arize.com/s/your-space",
+    api_key="your-api-key",
+)
+
+dataset = load_dataset_from_phoenix("my-dataset", config=config)
+```
+
+## Exporting experiments to Phoenix
+
+After running an evaluation, you can export the results to Phoenix Experiments for
+persistence, visualization, and comparison in the Phoenix UI.
+
+### Using environment variables
+
+```bash
+# Enable Phoenix experiment export
+export ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT=true
+export PHOENIX_BASE_URL=http://localhost:6006
+```
+
+### Using Python code
+
+```python
+from elastic_evals.datasets import load_dataset_from_phoenix
+from elastic_evals.export.phoenix_experiments import export_experiment_to_phoenix
+
+# Load dataset from Phoenix (preserves Phoenix dataset ID)
+dataset = load_dataset_from_phoenix("my-dataset")
+
+# Run your evaluation
+experiment = await client.run_experiment(
+    dataset=dataset,
+    task=my_task,
+    evaluators=my_evaluators,
+)
+
+# Export results to Phoenix Experiments
+result = await export_experiment_to_phoenix(
+    experiment=experiment,
+    dataset=dataset,
+    experiment_name="My Evaluation Run",
+)
+
+print(f"Phoenix Experiment ID: {result.experiment_id}")
+print(f"View at: {result.experiment_url}")
+```
+
+This syncs your evaluation results to Phoenix without re-running the experiment.
+The Phoenix Experiments UI will show all task outputs and evaluator scores.
 
 ## Evaluators reference
 
@@ -149,8 +311,10 @@ Results are stored in `RanExperiment`.
 - **Latency** (overall and span-level)
 - **Tool call counts**
 
-Trace-based evaluators require traces exported via OTLP and access to trace data in ES
-(set `TRACE_ES_URL`).
+Trace-based evaluators require:
+1. An OpenTelemetry collector (e.g., [EDOT Collector](https://www.elastic.co/docs/reference/edot-collector)) running to receive traces
+2. Tracing enabled with `ELASTIC_EVALS_TRACING_ENDPOINT` pointing to the collector
+3. Elasticsearch with APM data accessible via `TRACE_ES_URL`
 
 ## Elasticsearch export
 
@@ -225,6 +389,7 @@ elastic-evals run --suite agent-builder \
 ## Examples
 
 - [Agent Builder](examples/agent_builder/) - Evaluate Agent Builder responses
+- [Phoenix Evaluation](examples/phoenix_eval/) - Load datasets from Phoenix and run RAG, groundedness, and trace-based evaluators
 
 ## License
 
