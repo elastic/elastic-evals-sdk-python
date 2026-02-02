@@ -72,15 +72,17 @@ def _normalize_otlp_http_endpoint(endpoint: str) -> str:
 def _normalize_phoenix_endpoint(endpoint: str, use_grpc: bool) -> str:
     """Normalize Phoenix endpoint based on transport type."""
     parsed = urlparse(endpoint)
-    base = f"{parsed.scheme}://{parsed.netloc}"
 
     if use_grpc:
         # gRPC uses port 4317 by default
-        if parsed.port is None:
-            return f"{base}:4317"
-        return base
+        # Convert default HTTP port (6006) to default gRPC port (4317)
+        host = parsed.hostname or "localhost"
+        if parsed.port is None or parsed.port == 6006:
+            return f"{parsed.scheme}://{host}:4317"
+        return f"{parsed.scheme}://{host}:{parsed.port}"
 
     # HTTP uses /v1/traces path
+    base = f"{parsed.scheme}://{parsed.netloc}"
     if parsed.path in ("", "/"):
         return f"{base}/v1/traces"
     return endpoint

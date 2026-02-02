@@ -26,6 +26,7 @@ class PhoenixExperimentResult(BaseModel):
     experiment_id: str
     experiment_url: str | None = None
     dataset_id: str
+    repetitions: int
     task_runs_exported: int
     evaluation_runs_exported: int
 
@@ -67,7 +68,7 @@ class PhoenixExperimentExporter:
         """Export a completed experiment to Phoenix.
 
         This method creates a Phoenix experiment linked to the original dataset
-        and submits all task outputs and evaluation scores.
+        and submits all task outputs and evaluation scores, including all repetitions.
 
         Args:
             experiment: The completed experiment from elastic-evals
@@ -87,7 +88,6 @@ class PhoenixExperimentExporter:
 
         # Get Phoenix dataset
         phoenix_dataset = await self._get_phoenix_dataset(client, dataset)
-        # Phoenix Dataset can be a dict or an object depending on the client version
         if isinstance(phoenix_dataset, dict):
             phoenix_dataset_id = phoenix_dataset.get("id", "")
         else:
@@ -124,27 +124,39 @@ class PhoenixExperimentExporter:
         # Get unique evaluator names
         evaluator_names = list({er.name for er in experiment.evaluation_runs})
 
+        # Determine number of repetitions from the data
+        num_examples = len(dataset.examples)
+        repetitions = self._detect_repetitions(runs_by_key, num_examples)
+
         # Build passthrough task that returns pre-computed outputs
-        def create_passthrough_task(runs_index: dict[tuple[int, int], RunData]):
-            """Create a task that returns pre-computed outputs."""
-            # Track which example we're on (Phoenix calls task per example)
+        def create_passthrough_task(
+            runs_index: dict[tuple[int, int], RunData],
+            num_examples: int,
+        ):
+            """Create a task that returns pre-computed outputs.
+
+            Phoenix calls this once per (example, repetition) pair when
+            repetitions > 1. We track calls to determine which repetition we're on.
+            """
             call_counter = {"count": 0}
 
             def passthrough_task(example: Any) -> dict[str, Any]:
-                """Return pre-computed output for this example."""
-                idx = call_counter["count"]
+                """Return pre-computed output for this example and repetition."""
+                call_num = call_counter["count"]
                 call_counter["count"] += 1
 
-                # For repetition 0 (Phoenix doesn't support repetitions the same way)
-                key = (idx, 0)
+                # Phoenix iterates: rep0-ex0, rep0-ex1, ..., rep1-ex0, rep1-ex1, ...
+                repetition = call_num // num_examples
+                example_idx = call_num % num_examples
+
+                key = (example_idx, repetition)
                 if key in runs_index:
                     run_data = runs_index[key]
                     output = run_data.output
-                    # Ensure output is JSON serializable
                     if isinstance(output, dict):
                         return output
                     return {"output": output}
-                return {"output": None, "error": "No pre-computed output found"}
+                return {"output": None, "error": f"No output for example {example_idx}, repetition {repetition}"}
 
             return passthrough_task
 
@@ -152,16 +164,20 @@ class PhoenixExperimentExporter:
         def create_passthrough_evaluator(
             evaluator_name: str,
             evals_index: dict[tuple[int, int, str], EvaluationRun],
+            num_examples: int,
         ):
             """Create an evaluator that returns pre-computed scores."""
             call_counter = {"count": 0}
 
             def passthrough_evaluator(output: Any) -> dict[str, Any]:
                 """Return pre-computed evaluation result."""
-                idx = call_counter["count"]
+                call_num = call_counter["count"]
                 call_counter["count"] += 1
 
-                key = (idx, 0, evaluator_name)
+                repetition = call_num // num_examples
+                example_idx = call_num % num_examples
+
+                key = (example_idx, repetition, evaluator_name)
                 if key in evals_index:
                     eval_run = evals_index[key]
                     result = eval_run.result
@@ -172,26 +188,30 @@ class PhoenixExperimentExporter:
                             "explanation": result.explanation,
                             "metadata": result.metadata,
                         }
-                return {"score": None, "label": "missing", "explanation": "No pre-computed result"}
+                return {"score": None, "label": "missing", "explanation": f"No result for example {example_idx}, repetition {repetition}"}
 
             return passthrough_evaluator
 
         # Create evaluators dict for Phoenix
         evaluators_dict = {
-            name: create_passthrough_evaluator(name, evals_by_key)
+            name: create_passthrough_evaluator(name, evals_by_key, num_examples)
             for name in evaluator_names
         }
 
         # Run experiment through Phoenix API with passthrough wrappers
-        logger.info(f"Exporting experiment to Phoenix: {exp_name}")
+        logger.info(
+            f"Exporting experiment to Phoenix: {exp_name} "
+            f"({num_examples} examples, {repetitions} repetitions, {len(runs_by_key)} runs)"
+        )
 
         phoenix_experiment = await client.experiments.run_experiment(
             dataset=phoenix_dataset,
-            task=create_passthrough_task(runs_by_key),
+            task=create_passthrough_task(runs_by_key, num_examples),
             evaluators=evaluators_dict if evaluators_dict else None,
             experiment_name=exp_name,
             experiment_description=experiment_description or experiment.dataset_description,
             experiment_metadata=exp_metadata,
+            repetitions=repetitions,
             print_summary=False,
         )
 
@@ -209,13 +229,13 @@ class PhoenixExperimentExporter:
                 experiment_id=phoenix_experiment_id,
             )
         except Exception:
-            # URL generation might fail, that's okay
             pass
 
         return PhoenixExperimentResult(
             experiment_id=phoenix_experiment_id,
             experiment_url=experiment_url,
             dataset_id=phoenix_dataset_id,
+            repetitions=repetitions,
             task_runs_exported=len(runs_by_key),
             evaluation_runs_exported=len(evals_by_key),
         )
@@ -231,7 +251,6 @@ class PhoenixExperimentExporter:
         """
         metadata = dataset.metadata or {}
 
-        # Try to get by Phoenix dataset ID
         phoenix_dataset_id = metadata.get("phoenix_dataset_id")
         if phoenix_dataset_id:
             try:
@@ -239,7 +258,6 @@ class PhoenixExperimentExporter:
             except Exception as e:
                 logger.warning(f"Could not get Phoenix dataset by ID {phoenix_dataset_id}: {e}")
 
-        # Try to get by name
         phoenix_dataset_name = metadata.get("phoenix_dataset_name") or dataset.name
         try:
             return await client.datasets.get_dataset(dataset=phoenix_dataset_name)
@@ -272,6 +290,17 @@ class PhoenixExperimentExporter:
                 index[key] = eval_run
         return index
 
+    def _detect_repetitions(
+        self,
+        runs_by_key: dict[tuple[int, int], RunData],
+        num_examples: int,
+    ) -> int:
+        """Detect the number of repetitions from the runs data."""
+        if not runs_by_key:
+            return 1
+        max_repetition = max(rep for (_, rep) in runs_by_key.keys())
+        return max_repetition + 1
+
 
 async def export_experiment_to_phoenix(
     experiment: RanExperiment,
@@ -284,7 +313,7 @@ async def export_experiment_to_phoenix(
     """Export a completed experiment to Phoenix.
 
     This is a convenience function that creates a PhoenixExperimentExporter
-    and exports the experiment.
+    and exports the experiment. All repetitions are exported.
 
     Args:
         experiment: The completed experiment from elastic-evals
