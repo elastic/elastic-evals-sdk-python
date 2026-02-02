@@ -488,7 +488,34 @@ async def main() -> None:
         print(f"  Exported {len(documents)} score documents")
         print()
     
-    # 9. Generate report
+    # 9. Export to Phoenix Experiments (if enabled)
+    if config.phoenix_experiment_export:
+        print("Exporting experiment to Phoenix...")
+        try:
+            from elastic_evals.export.phoenix_experiments import export_experiment_to_phoenix
+            
+            phoenix_result = await export_experiment_to_phoenix(
+                experiment=result,
+                dataset=dataset,
+                experiment_name=f"elastic-evals: {config.run_id}",
+                experiment_metadata={
+                    "source": "phoenix_eval_example",
+                },
+                config=phoenix_config,
+            )
+            print(f"  Phoenix Experiment ID: {phoenix_result.experiment_id}")
+            if phoenix_result.experiment_url:
+                print(f"  View in Phoenix: {phoenix_result.experiment_url}")
+            print(f"  Task runs exported: {phoenix_result.task_runs_exported}")
+            print(f"  Evaluation runs exported: {phoenix_result.evaluation_runs_exported}")
+        except ImportError as e:
+            print(f"  WARNING: Phoenix export not available: {e}")
+            print("  Install with: pip install elastic-evals[phoenix]")
+        except Exception as e:
+            print(f"  ERROR: Failed to export to Phoenix: {e}")
+        print()
+    
+    # 10. Generate report
     print("Evaluation Results:")
     print("-" * 60)
     
@@ -537,7 +564,7 @@ async def main() -> None:
         display_options=display_options,
     )
     
-    # 10. Cleanup
+    # 11. Cleanup
     if trace_es_client:
         await trace_es_client.close()
     

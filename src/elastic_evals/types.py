@@ -30,6 +30,7 @@ class EvaluationDataset(BaseModel, Generic[TExample]):
     name: str
     description: str
     examples: list[TExample]
+    metadata: dict[str, Any] | None = None
 
 
 class EvaluationDatasetWithId(EvaluationDataset[TExample], Generic[TExample]):

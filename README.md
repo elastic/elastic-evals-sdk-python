@@ -146,6 +146,7 @@ Results are stored in `RanExperiment`.
 | `PHOENIX_PROJECT_NAME` | Phoenix project name | No | - |
 | `PHOENIX_API_KEY` | Phoenix Cloud API key | No | - |
 | `ELASTIC_EVALS_PHOENIX_USE_GRPC` | Use gRPC for Phoenix (`true`/`false`) | No | `false` |
+| `ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT` | Export experiments to Phoenix (`true`/`false`) | No | `false` |
 | `SELECTED_EVALUATORS` | Comma-separated evaluator names | No | - |
 | `RAG_EVAL_K` | Override RAG K | No | - |
 | `INDEX_FOCUSED_RAG_EVAL` | Restrict to ground-truth indices (`true`) | No | - |
@@ -250,6 +251,49 @@ config = PhoenixDatasetConfig(
 
 dataset = load_dataset_from_phoenix("my-dataset", config=config)
 ```
+
+## Exporting experiments to Phoenix
+
+After running an evaluation, you can export the results to Phoenix Experiments for
+persistence, visualization, and comparison in the Phoenix UI.
+
+### Using environment variables
+
+```bash
+# Enable Phoenix experiment export
+export ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT=true
+export PHOENIX_BASE_URL=http://localhost:6006
+```
+
+### Using Python code
+
+```python
+from elastic_evals.datasets import load_dataset_from_phoenix
+from elastic_evals.export.phoenix_experiments import export_experiment_to_phoenix
+
+# Load dataset from Phoenix (preserves Phoenix dataset ID)
+dataset = load_dataset_from_phoenix("my-dataset")
+
+# Run your evaluation
+experiment = await client.run_experiment(
+    dataset=dataset,
+    task=my_task,
+    evaluators=my_evaluators,
+)
+
+# Export results to Phoenix Experiments
+result = await export_experiment_to_phoenix(
+    experiment=experiment,
+    dataset=dataset,
+    experiment_name="My Evaluation Run",
+)
+
+print(f"Phoenix Experiment ID: {result.experiment_id}")
+print(f"View at: {result.experiment_url}")
+```
+
+This syncs your evaluation results to Phoenix without re-running the experiment.
+The Phoenix Experiments UI will show all task outputs and evaluator scores.
 
 ## Evaluators reference
 

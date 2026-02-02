@@ -71,7 +71,12 @@ def _convert_phoenix_dataset_to_evaluation_dataset(
     phoenix_dataset: Any,
     description: str | None = None,
 ) -> EvaluationDataset:
-    """Convert a Phoenix dataset to an EvaluationDataset."""
+    """Convert a Phoenix dataset to an EvaluationDataset.
+
+    Preserves Phoenix dataset metadata for later experiment export:
+    - phoenix_dataset_id: The Phoenix dataset ID
+    - phoenix_dataset_name: The Phoenix dataset name
+    """
     df = phoenix_dataset.to_dataframe()
 
     examples = []
@@ -100,10 +105,20 @@ def _convert_phoenix_dataset_to_evaluation_dataset(
         phoenix_dataset, "description", None
     ) or f"Loaded from Phoenix: {dataset_name}"
 
+    # Preserve Phoenix metadata for experiment export
+    phoenix_dataset_id = getattr(phoenix_dataset, "id", None)
+    dataset_metadata: dict[str, Any] = {
+        "source": "phoenix",
+        "phoenix_dataset_name": dataset_name,
+    }
+    if phoenix_dataset_id:
+        dataset_metadata["phoenix_dataset_id"] = phoenix_dataset_id
+
     return EvaluationDataset(
         name=dataset_name,
         description=dataset_description,
         examples=examples,
+        metadata=dataset_metadata,
     )
 
 
