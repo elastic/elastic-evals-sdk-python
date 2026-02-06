@@ -33,7 +33,7 @@ The `.env` file contains all configuration options with documentation:
 ```env
 # Required
 CONNECTOR_ID=your-connector-id
-KIBANA_AUTH=your-base64-encoded-credentials
+KIBANA_URL=http://elastic:changeme@localhost:5601
 
 # Phoenix
 PHOENIX_BASE_URL=http://localhost:6006
@@ -51,8 +51,7 @@ ELASTIC_EVALS_TRACING_TARGETS=otlp,phoenix
 ```bash
 # Kibana connector for LLM inference
 export CONNECTOR_ID="your-connector-id"
-export KIBANA_AUTH="base64-encoded-credentials"
-export KIBANA_URL="http://localhost:5601"
+export KIBANA_URL="http://elastic:changeme@localhost:5601"
 
 # Phoenix server
 export PHOENIX_BASE_URL="http://localhost:6006"

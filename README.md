@@ -55,8 +55,7 @@ Set required environment variables:
 
 ```bash
 export CONNECTOR_ID="your-connector-id"
-export KIBANA_AUTH="base64-user-pass"
-export KIBANA_URL="http://localhost:5620"
+export KIBANA_URL="http://elastic:changeme@localhost:5620"
 ```
 
 Minimal example with a custom evaluator:
@@ -132,7 +131,6 @@ Results are stored in `RanExperiment`.
 | `KIBANA_URL`                              | Kibana base URL                                         | No       | `http://localhost:5601`           |
 | `CONNECTOR_ID`                            | Kibana connector ID for tasks                           | Yes      | -                                 |
 | `EVALUATION_CONNECTOR_ID`                 | Connector ID for evaluator LLMs                         | No       | -                                 |
-| `KIBANA_AUTH`                             | Base64 credentials (`user:pass`)                        | Yes      | -                                 |
 | `EVALUATIONS_ES_URL`                      | Elasticsearch URL for scores                            | No       | -                                 |
 | `TRACE_ES_URL`                            | Elasticsearch URL for traces                            | No       | -                                 |
 | `ELASTIC_EVALS_RUN_ID`                    | Override run ID                                         | No       | UUID                              |
@@ -388,8 +386,7 @@ elastic-evals run --suite agent-builder \
   --connector-id "<connector-id>" \
   --evaluation-connector-id "<evaluator-connector-id>" \
   --evaluations-es-url "http://elastic:changeme@localhost:9220" \
-  --kibana-url "http://localhost:5620" \
-  --kibana-auth "ZWxhc3RpYzpjaGFuZ2VtZQ==" \
+  --kibana-url "http://elastic:changeme@localhost:5620" \
   --tracing-exporter "otlp" \
   --tracing-endpoint "http://localhost:4320"
 ```

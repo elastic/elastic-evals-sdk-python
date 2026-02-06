@@ -28,7 +28,7 @@ Example usage:
 
     # Option 2: Using environment variables
     export CONNECTOR_ID="your-connector-id"
-    export KIBANA_AUTH="base64-encoded-auth"
+    export KIBANA_URL="http://elastic:changeme@localhost:5601"
     python examples/phoenix_eval/run.py
 """
 
@@ -217,7 +217,6 @@ async def rag_task(
             },
             headers={
                 "kbn-xsrf": "true",
-                "Authorization": f"Basic {config.kibana_auth}",
                 "elastic-api-version": "2023-10-31",
             },
         )

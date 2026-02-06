@@ -18,7 +18,6 @@ def _require_env(name: str) -> None:
 
 def _run_agent_builder() -> None:
     _require_env("CONNECTOR_ID")
-    _require_env("KIBANA_AUTH")
     script_path = Path(__file__).resolve().parent / "run.py"
     if not script_path.is_file():
         raise RuntimeError("Agent Builder script not found.")
