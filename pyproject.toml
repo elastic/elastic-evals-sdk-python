@@ -37,6 +37,7 @@ elastic-evals = "elastic_evals.cli:main"
 
 [project.entry-points."elastic_evals.suites"]
 agent-builder = "examples.agent_builder.suite_plugin:get_suite"
+phoenix-eval = "examples.phoenix_eval.suite_plugin:get_suite"
 
 [build-system]
 requires = ["hatchling"]
