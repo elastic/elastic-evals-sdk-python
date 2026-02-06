@@ -5,9 +5,8 @@ from __future__ import annotations
 from rich.console import Console
 
 from elastic_evals.export.documents import ModelInfo
-from elastic_evals.reporting.stats import calculate_overall_stats, get_unique_evaluator_names
 from elastic_evals.reporting.table import create_report_table
-from elastic_evals.reporting.types import DatasetScoreWithStats, ReportDisplayOptions
+from elastic_evals.reporting.types import EvaluatorStats, ReportDisplayOptions
 
 
 def build_report_header(task_model: ModelInfo, evaluator_model: ModelInfo) -> list[str]:
@@ -24,14 +23,13 @@ class DefaultReporter:
 
     def report(
         self,
-        dataset_scores: list[DatasetScoreWithStats],
+        stats: list[EvaluatorStats],
+        repetitions: int,
         task_model: ModelInfo,
         evaluator_model: ModelInfo,
         display_options: ReportDisplayOptions | None = None,
     ) -> None:
-        evaluator_names = get_unique_evaluator_names(dataset_scores)
-        overall_stats = calculate_overall_stats(dataset_scores)
-        table = create_report_table(dataset_scores, overall_stats, evaluator_names, display_options)
+        table = create_report_table(stats, repetitions, display_options)
 
         header = build_report_header(task_model, evaluator_model)
         self._console.print()

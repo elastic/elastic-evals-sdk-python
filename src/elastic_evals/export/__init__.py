@@ -5,12 +5,11 @@ from .git_metadata import GitMetadata, get_git_metadata
 from .repository import (
     EvaluationScoreRepository,
     build_flattened_score_documents,
-    compute_input_hash,
 )
 
 # Phoenix exports are optional - only available if phoenix is installed
 try:
-    from .phoenix_experiments import (
+    from .phoenix_experiments import (  # noqa: F401
         PhoenixExperimentExporter,
         PhoenixExperimentResult,
         export_experiment_to_phoenix,
@@ -29,7 +28,6 @@ __all__ = [
     "EvaluationScoreRepository",
     "GitMetadata",
     "build_flattened_score_documents",
-    "compute_input_hash",
     "get_git_metadata",
     *_PHOENIX_EXPORTS,
 ]
