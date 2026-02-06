@@ -29,7 +29,7 @@ phoenix = [
     "python-dotenv>=1.0",
     "pandas>=2.0",
 ]
-dev = ["pytest", "pytest-asyncio", "ruff", "mypy"]
+dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "pre-commit"]
 all = ["elastic-evals[phoenix,dev]"]
 
 [project.scripts]

@@ -9,7 +9,7 @@ from typing import Any
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential
 
 from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.evaluators.correctness.prompt import PROMPT, render_user_prompt, tool_choice
+from elastic_evals.evaluators.correctness.prompt import PROMPT, tool_choice
 from elastic_evals.evaluators.correctness.scoring import (
     calculate_factual_score,
     calculate_procedural_fidelity_score,
@@ -44,7 +44,11 @@ def _should_run_correctness_analysis() -> bool:
 def _parse_tool_arguments(tool_call: Any) -> dict[str, Any]:
     if not tool_call or not tool_call.function:
         raise ValueError("No tool call found in LLM response")
-    arguments = tool_call.function.get("arguments") if isinstance(tool_call.function, dict) else None
+    arguments = (
+        tool_call.function.get("arguments")
+        if isinstance(tool_call.function, dict)
+        else None
+    )
     if arguments is None:
         raise ValueError("No tool arguments found in LLM response")
     if isinstance(arguments, str):
@@ -77,7 +81,9 @@ def create_correctness_analysis_evaluator(
             user_query = (params.input or {}).get("question")
             messages = (params.output or {}).get("messages") or []
             latest_message = messages[-1].get("message") if messages else None
-            ground_truth_response = (params.expected or {}).get("expected") if params.expected else None
+            ground_truth_response = (
+                (params.expected or {}).get("expected") if params.expected else None
+            )
 
             response = await inference_client.prompt(
                 prompt=PROMPT,
@@ -96,7 +102,9 @@ def create_correctness_analysis_evaluator(
             return CorrectnessAnalysis.model_validate(analysis_payload)
 
         try:
-            correctness_analysis = await _run_with_retries(log, run_analysis, "correctness analysis")
+            correctness_analysis = await _run_with_retries(
+                log, run_analysis, "correctness analysis"
+            )
         except Exception as exc:
             log.error(
                 "Failed to retrieve correctness analysis after retries (no valid tool call or malformed response)",
@@ -128,7 +136,9 @@ def create_quantitative_correctness_evaluators() -> list[Evaluator]:
             return None
         return CorrectnessAnalysis.model_validate(analysis_data)
 
-    def quantitative_evaluator(name: str, score_calculator, summary_key: str) -> Evaluator:
+    def quantitative_evaluator(
+        name: str, score_calculator, summary_key: str
+    ) -> Evaluator:
         async def evaluate(params: EvaluatorParams) -> EvaluationResult:
             correctness_analysis = extract_correctness_analysis(params.output)
             if not correctness_analysis:
@@ -151,9 +161,15 @@ def create_quantitative_correctness_evaluators() -> list[Evaluator]:
         return SimpleEvaluator(name=name, kind="LLM", evaluate=evaluate)
 
     return [
-        quantitative_evaluator("Factuality", calculate_factual_score, "factual_accuracy_summary"),
-        quantitative_evaluator("Relevance", calculate_relevance_score, "relevance_summary"),
         quantitative_evaluator(
-            "Sequence Accuracy", calculate_procedural_fidelity_score, "sequence_accuracy_summary"
+            "Factuality", calculate_factual_score, "factual_accuracy_summary"
+        ),
+        quantitative_evaluator(
+            "Relevance", calculate_relevance_score, "relevance_summary"
+        ),
+        quantitative_evaluator(
+            "Sequence Accuracy",
+            calculate_procedural_fidelity_score,
+            "sequence_accuracy_summary",
         ),
     ]

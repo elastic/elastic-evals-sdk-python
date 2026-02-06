@@ -101,14 +101,17 @@ asyncio.run(main())
 ## Core concepts
 
 ### Dataset
+
 An `EvaluationDataset` is a collection of `Example` items with input, expected output,
 and optional metadata. Each dataset is hashed into a stable ID for exports.
 
 ### Task
+
 A task is an async function that consumes an `Example` and returns a task output
 that evaluators will score.
 
 ### Evaluator
+
 Evaluators implement `evaluate()` and return an `EvaluationResult`. They can be:
 
 - **LLM** (LLM-as-judge): correctness, groundedness, criteria
@@ -116,6 +119,7 @@ Evaluators implement `evaluate()` and return an `EvaluationResult`. They can be:
 - **Trace-based**: token usage, latency, tool calls (requires trace export + ES access)
 
 ### Experiment
+
 An experiment is a full evaluation run combining a dataset, task, and evaluators.
 Results are stored in `RanExperiment`.
 
@@ -123,34 +127,34 @@ Results are stored in `RanExperiment`.
 
 ### Environment variables
 
-| Variable | Description | Required | Default |
-| --- | --- | --- | --- |
-| `KIBANA_URL` | Kibana base URL | No | `http://localhost:5601` |
-| `CONNECTOR_ID` | Kibana connector ID for tasks | Yes | - |
-| `EVALUATION_CONNECTOR_ID` | Connector ID for evaluator LLMs | No | - |
-| `KIBANA_AUTH` | Base64 credentials (`user:pass`) | Yes | - |
-| `EVALUATIONS_ES_URL` | Elasticsearch URL for scores | No | - |
-| `TRACE_ES_URL` | Elasticsearch URL for traces | No | - |
-| `ELASTIC_EVALS_RUN_ID` | Override run ID | No | UUID |
-| `ELASTIC_EVALS_REPETITIONS` | Number of repetitions | No | `3` |
-| `ELASTIC_EVALS_CONCURRENCY` | Concurrency level | No | `5` |
-| `ELASTIC_EVALS_LOG_LEVEL` | Log level | No | `INFO` |
-| `ELASTIC_EVALS_MODEL` | JSON model metadata override | No | - |
-| `ELASTIC_EVALS_TRACING_ENABLED` | Enable tracing (`true`/`false`) | No | `true` |
-| `ELASTIC_EVALS_TRACING_EXPORTER` | Tracing exporter (`otlp`, `phoenix`, `console`, `none`) | No | `otlp` |
-| `ELASTIC_EVALS_TRACING_ENDPOINT` | OTLP/HTTP endpoint | No | `http://localhost:4318/v1/traces` |
-| `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name | No | `elastic-evals` |
-| `ELASTIC_EVALS_TRACING_TARGETS` | Comma-separated exporters for multi-export | No | - |
-| `ELASTIC_EVALS_TRACING_EXPORTERS` | JSON array of exporter configs | No | - |
-| `PHOENIX_BASE_URL` | Phoenix REST API URL (for datasets/experiments) | No | `http://localhost:6006` |
-| `PHOENIX_COLLECTOR_ENDPOINT` | Phoenix OTLP endpoint (for traces) | No | `http://localhost:6006` |
-| `PHOENIX_PROJECT_NAME` | Phoenix project name | No | - |
-| `PHOENIX_API_KEY` | Phoenix Cloud API key | No | - |
-| `ELASTIC_EVALS_PHOENIX_USE_GRPC` | Use gRPC for Phoenix (`true`/`false`) | No | `false` |
-| `ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT` | Export experiments to Phoenix (`true`/`false`) | No | `false` |
-| `SELECTED_EVALUATORS` | Comma-separated evaluator names | No | - |
-| `RAG_EVAL_K` | Override RAG K | No | - |
-| `INDEX_FOCUSED_RAG_EVAL` | Restrict to ground-truth indices (`true`) | No | - |
+| Variable                                  | Description                                             | Required | Default                           |
+| ----------------------------------------- | ------------------------------------------------------- | -------- | --------------------------------- |
+| `KIBANA_URL`                              | Kibana base URL                                         | No       | `http://localhost:5601`           |
+| `CONNECTOR_ID`                            | Kibana connector ID for tasks                           | Yes      | -                                 |
+| `EVALUATION_CONNECTOR_ID`                 | Connector ID for evaluator LLMs                         | No       | -                                 |
+| `KIBANA_AUTH`                             | Base64 credentials (`user:pass`)                        | Yes      | -                                 |
+| `EVALUATIONS_ES_URL`                      | Elasticsearch URL for scores                            | No       | -                                 |
+| `TRACE_ES_URL`                            | Elasticsearch URL for traces                            | No       | -                                 |
+| `ELASTIC_EVALS_RUN_ID`                    | Override run ID                                         | No       | UUID                              |
+| `ELASTIC_EVALS_REPETITIONS`               | Number of repetitions                                   | No       | `3`                               |
+| `ELASTIC_EVALS_CONCURRENCY`               | Concurrency level                                       | No       | `5`                               |
+| `ELASTIC_EVALS_LOG_LEVEL`                 | Log level                                               | No       | `INFO`                            |
+| `ELASTIC_EVALS_MODEL`                     | JSON model metadata override                            | No       | -                                 |
+| `ELASTIC_EVALS_TRACING_ENABLED`           | Enable tracing (`true`/`false`)                         | No       | `true`                            |
+| `ELASTIC_EVALS_TRACING_EXPORTER`          | Tracing exporter (`otlp`, `phoenix`, `console`, `none`) | No       | `otlp`                            |
+| `ELASTIC_EVALS_TRACING_ENDPOINT`          | OTLP/HTTP endpoint                                      | No       | `http://localhost:4318/v1/traces` |
+| `ELASTIC_EVALS_TRACING_SERVICE_NAME`      | Tracing service name                                    | No       | `elastic-evals`                   |
+| `ELASTIC_EVALS_TRACING_TARGETS`           | Comma-separated exporters for multi-export              | No       | -                                 |
+| `ELASTIC_EVALS_TRACING_EXPORTERS`         | JSON array of exporter configs                          | No       | -                                 |
+| `PHOENIX_BASE_URL`                        | Phoenix REST API URL (for datasets/experiments)         | No       | `http://localhost:6006`           |
+| `PHOENIX_COLLECTOR_ENDPOINT`              | Phoenix OTLP endpoint (for traces)                      | No       | `http://localhost:6006`           |
+| `PHOENIX_PROJECT_NAME`                    | Phoenix project name                                    | No       | -                                 |
+| `PHOENIX_API_KEY`                         | Phoenix Cloud API key                                   | No       | -                                 |
+| `ELASTIC_EVALS_PHOENIX_USE_GRPC`          | Use gRPC for Phoenix (`true`/`false`)                   | No       | `false`                           |
+| `ELASTIC_EVALS_PHOENIX_EXPERIMENT_EXPORT` | Export experiments to Phoenix (`true`/`false`)          | No       | `false`                           |
+| `SELECTED_EVALUATORS`                     | Comma-separated evaluator names                         | No       | -                                 |
+| `RAG_EVAL_K`                              | Override RAG K                                          | No       | -                                 |
+| `INDEX_FOCUSED_RAG_EVAL`                  | Restrict to ground-truth indices (`true`)               | No       | -                                 |
 
 ## Multi-exporter tracing
 
@@ -299,19 +303,23 @@ The Phoenix Experiments UI will show all task outputs and evaluator scores.
 ## Evaluators reference
 
 ### LLM evaluators
+
 - **Correctness analysis**: structured judgment of factuality, relevance, and sequence accuracy
 - **Groundedness analysis**: verifies claims against tool-call evidence
 - **Criteria evaluator**: custom PASS/FAIL/N/A criteria for arbitrary checks
 
 ### CODE evaluators
+
 - **RAG metrics**: Precision@K, Recall@K, and F1@K for retrieval quality
 
 ### Trace-based evaluators
+
 - **Input/Output/Cached tokens**
 - **Latency** (overall and span-level)
 - **Tool call counts**
 
 Trace-based evaluators require:
+
 1. An OpenTelemetry collector (e.g., [EDOT Collector](https://www.elastic.co/docs/reference/edot-collector)) running to receive traces
 2. Tracing enabled with `ELASTIC_EVALS_TRACING_ENDPOINT` pointing to the collector
 3. Elasticsearch with APM data accessible via `TRACE_ES_URL`
@@ -390,6 +398,23 @@ elastic-evals run --suite agent-builder \
 
 - [Agent Builder](examples/agent_builder/) - Evaluate Agent Builder responses
 - [Phoenix Evaluation](examples/phoenix_eval/) - Load datasets from Phoenix and run RAG, groundedness, and trace-based evaluators
+
+## Development
+
+Install dev dependencies and set up pre-commit hooks for automatic linting and formatting:
+
+```bash
+uv sync --extra dev
+uv run pre-commit install
+```
+
+Pre-commit runs [ruff](https://docs.astral.sh/ruff/) for linting and formatting on every commit. You can also run them manually:
+
+```bash
+uv run ruff check src/       # lint
+uv run ruff format src/      # format
+uv run pre-commit run --all-files  # run all hooks
+```
 
 ## License
 
