@@ -59,7 +59,9 @@ def _parse_tracing_exporters() -> list[ExporterConfig]:
         try:
             exporters_data = json.loads(exporters_json)
         except json.JSONDecodeError as exc:
-            raise ValueError("ELASTIC_EVALS_TRACING_EXPORTERS must be valid JSON") from exc
+            raise ValueError(
+                "ELASTIC_EVALS_TRACING_EXPORTERS must be valid JSON"
+            ) from exc
 
         if not isinstance(exporters_data, list):
             raise ValueError("ELASTIC_EVALS_TRACING_EXPORTERS must be a JSON array")
@@ -143,9 +145,8 @@ class ElasticEvalsConfig(BaseModel):
     kibana_url: str = "http://localhost:5601"
     connector_id: str
     evaluator_connector_id: str | None = None
-    kibana_auth: str
 
-    evaluations_es_url: str | None = None
+    evaluations_es_url: str
     trace_es_url: str | None = None
 
     tracing: TracingConfig = Field(default_factory=TracingConfig)
@@ -163,18 +164,23 @@ class ElasticEvalsConfig(BaseModel):
     @classmethod
     def from_env(cls) -> "ElasticEvalsConfig":
         run_id = os.environ.get("ELASTIC_EVALS_RUN_ID") or str(uuid.uuid4())
-        repetitions = _parse_int(os.environ.get("ELASTIC_EVALS_REPETITIONS", "3"), name="repetitions")
-        concurrency = _parse_int(os.environ.get("ELASTIC_EVALS_CONCURRENCY", "5"), name="concurrency")
+        repetitions = _parse_int(
+            os.environ.get("ELASTIC_EVALS_REPETITIONS", "3"), name="repetitions"
+        )
+        concurrency = _parse_int(
+            os.environ.get("ELASTIC_EVALS_CONCURRENCY", "5"), name="concurrency"
+        )
         kibana_url = os.environ.get("KIBANA_URL", "http://localhost:5601")
         connector_id = _get_required_env("CONNECTOR_ID")
         evaluator_connector_id = os.environ.get("EVALUATION_CONNECTOR_ID")
-        kibana_auth = _get_required_env("KIBANA_AUTH")
-        evaluations_es_url = os.environ.get("EVALUATIONS_ES_URL")
+        evaluations_es_url = _get_required_env("EVALUATIONS_ES_URL")
         trace_es_url = os.environ.get("TRACE_ES_URL")
 
         log_level = os.environ.get("ELASTIC_EVALS_LOG_LEVEL", "INFO").upper()
         if log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
-            raise ValueError("ELASTIC_EVALS_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR")
+            raise ValueError(
+                "ELASTIC_EVALS_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR"
+            )
 
         model_payload = os.environ.get("ELASTIC_EVALS_MODEL")
         model = None
@@ -195,7 +201,9 @@ class ElasticEvalsConfig(BaseModel):
         tracing = TracingConfig(
             enabled=tracing_enabled,
             exporters=exporters,
-            service_name=os.environ.get("ELASTIC_EVALS_TRACING_SERVICE_NAME", "elastic-evals"),
+            service_name=os.environ.get(
+                "ELASTIC_EVALS_TRACING_SERVICE_NAME", "elastic-evals"
+            ),
             run_id=run_id,
         )
 
@@ -213,7 +221,6 @@ class ElasticEvalsConfig(BaseModel):
             kibana_url=kibana_url,
             connector_id=connector_id,
             evaluator_connector_id=evaluator_connector_id,
-            kibana_auth=kibana_auth,
             evaluations_es_url=evaluations_es_url,
             trace_es_url=trace_es_url,
             tracing=tracing,

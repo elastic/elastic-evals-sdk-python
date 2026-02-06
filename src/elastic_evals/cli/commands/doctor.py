@@ -31,28 +31,30 @@ def doctor_cmd() -> None:
     if not os.environ.get("CONNECTOR_ID"):
         issues.append("CONNECTOR_ID environment variable not set.")
 
-    if not os.environ.get("KIBANA_AUTH"):
-        issues.append("KIBANA_AUTH environment variable not set.")
-
     if not os.environ.get("EVALUATION_CONNECTOR_ID"):
-        warnings.append("EVALUATION_CONNECTOR_ID not set (required for LLM evaluators).")
+        warnings.append(
+            "EVALUATION_CONNECTOR_ID not set (required for LLM evaluators)."
+        )
 
     if not os.environ.get("EVALUATIONS_ES_URL"):
-        warnings.append("EVALUATIONS_ES_URL not set - ES export will be disabled.")
+        issues.append("EVALUATIONS_ES_URL environment variable not set.")
 
     if not os.environ.get("TRACE_ES_URL"):
         warnings.append("TRACE_ES_URL not set - trace-based evaluators will fail.")
 
-    kibana_url = os.environ.get("KIBANA_URL", "http://localhost:5601")
-    host, port = _parse_host_port(kibana_url)
-    if port is None:
-        warnings.append(f"Could not parse Kibana port from {kibana_url}.")
+    kibana_url = os.environ.get("KIBANA_URL")
+    if not kibana_url:
+        issues.append("KIBANA_URL environment variable not set.")
     else:
-        try:
-            if not _check_socket(host, port):
-                warnings.append(f"Cannot connect to Kibana at {kibana_url}.")
-        except OSError as exc:
-            warnings.append(f"Could not check Kibana connectivity: {exc}.")
+        host, port = _parse_host_port(kibana_url)
+        if port is None:
+            warnings.append(f"Could not parse Kibana port from {kibana_url}.")
+        else:
+            try:
+                if not _check_socket(host, port):
+                    warnings.append(f"Cannot connect to Kibana at {kibana_url}.")
+            except OSError as exc:
+                warnings.append(f"Could not check Kibana connectivity: {exc}.")
 
     if issues:
         click.echo(click.style("Issues:", fg="red", bold=True))

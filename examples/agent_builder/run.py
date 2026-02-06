@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Iterable
 
 from elasticsearch import AsyncElasticsearch
 
@@ -21,8 +20,6 @@ from elastic_evals.export import EvaluationScoreRepository
 from elastic_evals.export.documents import ModelInfo
 from elastic_evals.export.repository import build_flattened_score_documents
 from elastic_evals.reporting import DefaultReporter
-from elastic_evals.reporting.stats import calculate_evaluator_stats
-from elastic_evals.reporting.types import DatasetScoreWithStats
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluatorParams
 
@@ -36,31 +33,6 @@ def _model_info_from_config(config: ElasticEvalsConfig) -> ModelInfo:
         id=model.get("id"),
         family=model.get("family", "unknown"),
         provider=model.get("provider", "unknown"),
-    )
-
-
-def _build_dataset_scores_with_stats(
-    *, repetitions: int, evaluator_names: Iterable[str], experiment
-) -> DatasetScoreWithStats:
-    total_examples = len(ambiguous_queries_dataset.examples) * repetitions
-    evaluator_scores: dict[str, list[float]] = {name: [] for name in evaluator_names}
-
-    for evaluation_run in experiment.evaluation_runs or []:
-        score = evaluation_run.result.score if evaluation_run.result else None
-        if score is None:
-            continue
-        evaluator_scores.setdefault(evaluation_run.name, []).append(score)
-
-    return DatasetScoreWithStats(
-        id=experiment.dataset_id,
-        name=experiment.dataset_name or ambiguous_queries_dataset.name,
-        num_examples=total_examples,
-        evaluator_scores=evaluator_scores,
-        evaluator_stats={
-            name: calculate_evaluator_stats(scores, total_examples)
-            for name, scores in evaluator_scores.items()
-        },
-        experiment_id=experiment.id,
     )
 
 
@@ -109,35 +81,30 @@ async def main() -> None:
         evaluators=quantitative_evaluators,
     )
 
-    if config.evaluations_es_url:
-        es = AsyncElasticsearch(config.evaluations_es_url)
-        repository = EvaluationScoreRepository(es, log)
-        task_model = _model_info_from_config(config)
-        evaluator_model = _model_info_from_config(config)
-        documents = build_flattened_score_documents(
-            experiments=[result],
-            task_model=task_model,
-            evaluator_model=evaluator_model,
-            run_id=config.run_id,
-            total_repetitions=config.repetitions,
-        )
-        await repository.export_scores(documents)
-        await es.close()
-
-    reporter = DefaultReporter()
-    evaluator_names = [evaluator.name for evaluator in quantitative_evaluators]
-    dataset_scores = [
-        _build_dataset_scores_with_stats(
-            repetitions=config.repetitions,
-            evaluator_names=evaluator_names,
-            experiment=result,
-        )
-    ]
-    reporter.report(
-        dataset_scores=dataset_scores,
-        task_model=_model_info_from_config(config),
-        evaluator_model=_model_info_from_config(config),
+    es = AsyncElasticsearch(config.evaluations_es_url)
+    repository = EvaluationScoreRepository(es, log)
+    task_model = _model_info_from_config(config)
+    evaluator_model = _model_info_from_config(config)
+    documents = build_flattened_score_documents(
+        experiments=[result],
+        task_model=task_model,
+        evaluator_model=evaluator_model,
+        run_id=config.run_id,
+        total_repetitions=config.repetitions,
     )
+    await repository.export_scores(documents)
+
+    run_stats = await repository.get_stats_by_run_id(config.run_id)
+    await es.close()
+
+    if run_stats:
+        reporter = DefaultReporter()
+        reporter.report(
+            stats=run_stats.stats,
+            repetitions=run_stats.total_repetitions,
+            task_model=run_stats.task_model,
+            evaluator_model=run_stats.evaluator_model,
+        )
 
 
 if __name__ == "__main__":

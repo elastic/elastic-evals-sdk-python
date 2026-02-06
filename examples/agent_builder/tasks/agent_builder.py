@@ -10,7 +10,9 @@ from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.types import Example
 
 
-async def agent_builder_task(example: Example, config: ElasticEvalsConfig) -> dict[str, Any]:
+async def agent_builder_task(
+    example: Example, config: ElasticEvalsConfig
+) -> dict[str, Any]:
     """Call Agent Builder API and return response."""
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -21,7 +23,6 @@ async def agent_builder_task(example: Example, config: ElasticEvalsConfig) -> di
             },
             headers={
                 "kbn-xsrf": "true",
-                "Authorization": f"Basic {config.kibana_auth}",
                 "elastic-api-version": "2023-10-31",
             },
         )

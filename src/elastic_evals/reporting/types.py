@@ -8,29 +8,23 @@ from pydantic import BaseModel, Field
 
 from elastic_evals.export.documents import ModelInfo
 
-StatKey = Literal["percentage", "mean", "median", "std_dev", "min", "max"]
+StatKey = Literal["mean", "median", "std_dev", "min", "max"]
 
 
-class EvaluatorStats(BaseModel):
+class StatsDisplay(BaseModel):
     mean: float
     median: float
     std_dev: float
     min: float
     max: float
     count: int
-    percentage: float
 
 
-class DatasetScore(BaseModel):
-    id: str
-    name: str
-    num_examples: int
-    evaluator_scores: dict[str, list[float]]
-    experiment_id: str
-
-
-class DatasetScoreWithStats(DatasetScore):
-    evaluator_stats: dict[str, EvaluatorStats]
+class EvaluatorStats(BaseModel):
+    dataset_id: str
+    dataset_name: str
+    evaluator_name: str
+    stats: StatsDisplay
 
 
 class EvaluatorDisplayOptions(BaseModel):
@@ -45,13 +39,22 @@ class EvaluatorDisplayGroup(BaseModel):
 
 
 class ReportDisplayOptions(BaseModel):
-    evaluator_display_options: dict[str, EvaluatorDisplayOptions] = Field(default_factory=dict)
+    evaluator_display_options: dict[str, EvaluatorDisplayOptions] = Field(
+        default_factory=dict
+    )
     evaluator_display_groups: list[EvaluatorDisplayGroup] = Field(default_factory=list)
 
 
 class EvaluationReport(BaseModel):
-    dataset_scores_with_stats: list[DatasetScoreWithStats]
+    stats: list[EvaluatorStats]
     model: ModelInfo
     evaluator_model: ModelInfo
     repetitions: int
     run_id: str
+
+
+class RunStats(BaseModel):
+    stats: list[EvaluatorStats]
+    task_model: ModelInfo
+    evaluator_model: ModelInfo
+    total_repetitions: int

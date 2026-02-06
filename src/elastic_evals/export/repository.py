@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import datetime
 from socket import gethostname
 from typing import Any, Iterable
@@ -22,6 +20,7 @@ from elastic_evals.export.documents import (
     TaskInfo,
 )
 from elastic_evals.export.git_metadata import get_git_metadata
+from elastic_evals.reporting.types import EvaluatorStats, RunStats, StatsDisplay
 from elastic_evals.tracing import get_current_trace_id
 from elastic_evals.utils.logging import (
     log_bulk_error,
@@ -37,14 +36,6 @@ from elastic_evals.types import EvaluationResult, RanExperiment
 EVALUATIONS_DATA_STREAM_ALIAS = ".kibana-evaluations"
 EVALUATIONS_DATA_STREAM_WILDCARD = ".kibana-evaluations*"
 EVALUATIONS_DATA_STREAM_TEMPLATE = "kibana-evaluations-template"
-
-
-def compute_input_hash(input_data: Any) -> str:
-    try:
-        json_data = json.dumps(input_data)
-        return hashlib.sha256(json_data.encode("utf-8")).hexdigest()[:16]
-    except Exception:
-        return ""
 
 
 def _build_index_template() -> dict[str, Any]:
@@ -68,7 +59,6 @@ def _build_index_template() -> dict[str, Any]:
                         "properties": {
                             "id": {"type": "keyword"},
                             "index": {"type": "integer"},
-                            "input_hash": {"type": "keyword"},
                             "dataset": {
                                 "type": "object",
                                 "properties": {
@@ -159,9 +149,13 @@ class EvaluationScoreRepository:
         try:
             await self._es.indices.get_data_stream(name=EVALUATIONS_DATA_STREAM_ALIAS)
         except Exception as error:
-            status = getattr(error, "status_code", None) or getattr(error, "status", None)
+            status = getattr(error, "status_code", None) or getattr(
+                error, "status", None
+            )
             if status == 404:
-                await self._es.indices.create_data_stream(name=EVALUATIONS_DATA_STREAM_ALIAS)
+                await self._es.indices.create_data_stream(
+                    name=EVALUATIONS_DATA_STREAM_ALIAS
+                )
                 self._log.debug(f"Created datastream: {EVALUATIONS_DATA_STREAM_ALIAS}")
             else:
                 raise
@@ -187,7 +181,9 @@ class EvaluationScoreRepository:
                     str(doc.task.repetition_index),
                 ]
             )
-            operations.append({"create": {"_index": EVALUATIONS_DATA_STREAM_ALIAS, "_id": doc_id}})
+            operations.append(
+                {"create": {"_index": EVALUATIONS_DATA_STREAM_ALIAS, "_id": doc_id}}
+            )
             operations.append(doc.model_dump(by_alias=True, mode="json"))
 
         response = await self._es.bulk(operations=operations, refresh="wait_for")
@@ -226,6 +222,104 @@ class EvaluationScoreRepository:
 
         return results
 
+    async def get_stats_by_run_id(self, run_id: str) -> RunStats | None:
+        query = {"term": {"run_id": run_id}}
+        metadata_response = await self._es.search(
+            index=EVALUATIONS_DATA_STREAM_WILDCARD,
+            query=query,
+            size=1,
+        )
+        hits = metadata_response.get("hits", {}).get("hits", [])
+        if not hits:
+            return None
+
+        metadata_source = hits[0].get("_source", {})
+        task_model = ModelInfo(**metadata_source.get("task", {}).get("model", {}))
+        evaluator_model = ModelInfo(
+            **metadata_source.get("evaluator", {}).get("model", {})
+        )
+        total_repetitions = (
+            metadata_source.get("run_metadata", {}).get("total_repetitions") or 0
+        )
+
+        agg_response = await self._es.search(
+            index=EVALUATIONS_DATA_STREAM_WILDCARD,
+            query=query,
+            size=0,
+            aggs={
+                "by_dataset": {
+                    "terms": {"field": "example.dataset.id", "size": 10000},
+                    "aggs": {
+                        "dataset_name": {
+                            "terms": {"field": "example.dataset.name", "size": 1}
+                        },
+                        "by_evaluator": {
+                            "terms": {"field": "evaluator.name", "size": 1000},
+                            "aggs": {
+                                "score_stats": {
+                                    "extended_stats": {"field": "evaluator.score"}
+                                },
+                                "score_median": {
+                                    "percentiles": {
+                                        "field": "evaluator.score",
+                                        "percents": [50],
+                                    }
+                                },
+                            },
+                        },
+                    },
+                }
+            },
+        )
+
+        stats: list[EvaluatorStats] = []
+        dataset_buckets = (
+            agg_response.get("aggregations", {})
+            .get("by_dataset", {})
+            .get("buckets", [])
+        )
+        for dataset_bucket in dataset_buckets:
+            dataset_id = dataset_bucket.get("key", "")
+            name_bucket = dataset_bucket.get("dataset_name", {}).get("buckets", [])
+            dataset_name = name_bucket[0].get("key") if name_bucket else dataset_id
+
+            for evaluator_bucket in dataset_bucket.get("by_evaluator", {}).get(
+                "buckets", []
+            ):
+                evaluator_name = evaluator_bucket.get("key", "")
+                score_stats = evaluator_bucket.get("score_stats", {})
+                percentiles = evaluator_bucket.get("score_median", {}).get("values", {})
+
+                mean = score_stats.get("avg") or 0.0
+                std_dev = score_stats.get("std_deviation") or 0.0
+                min_value = score_stats.get("min") or 0.0
+                max_value = score_stats.get("max") or 0.0
+                count = int(score_stats.get("count") or 0)
+                median = percentiles.get("50.0") or 0.0
+
+                stats.append(
+                    EvaluatorStats(
+                        dataset_id=dataset_id,
+                        dataset_name=dataset_name,
+                        evaluator_name=evaluator_name,
+                        stats=StatsDisplay(
+                            mean=float(mean),
+                            median=float(median),
+                            std_dev=float(std_dev),
+                            min=float(min_value),
+                            max=float(max_value),
+                            count=count,
+                        ),
+                    )
+                )
+
+        return RunStats(
+            stats=stats,
+            task_model=task_model,
+            evaluator_model=evaluator_model,
+            total_repetitions=int(total_repetitions),
+        )
+
 
 def build_flattened_score_documents(
     *,
@@ -250,7 +344,10 @@ def build_flattened_score_documents(
             run_entry = None
             if eval_run.experiment_run_id and eval_run.experiment_run_id in runs_by_id:
                 run_entry = runs_by_id[eval_run.experiment_run_id]
-            elif eval_run.example_index is not None and eval_run.repetition_index is not None:
+            elif (
+                eval_run.example_index is not None
+                and eval_run.repetition_index is not None
+            ):
                 run_entry = next(
                     (
                         run
@@ -261,7 +358,9 @@ def build_flattened_score_documents(
                     None,
                 )
 
-            example_index = run_entry.example_index if run_entry else (eval_run.example_index or 0)
+            example_index = (
+                run_entry.example_index if run_entry else (eval_run.example_index or 0)
+            )
             if eval_run.repetition_index is not None:
                 repetition_index = eval_run.repetition_index
             elif run_entry:
@@ -273,7 +372,6 @@ def build_flattened_score_documents(
                 or getattr(run_entry, "dataset_example_id", None)
                 or str(example_index)
             )
-            input_hash = compute_input_hash(run_entry.input) if run_entry else ""
             trace_id = run_entry.trace_id if run_entry else get_current_trace_id()
 
             evaluator_result = eval_run.result or EvaluationResult()
@@ -286,7 +384,6 @@ def build_flattened_score_documents(
                         "example": ExampleInfo(
                             id=example_id,
                             index=example_index,
-                            input_hash=input_hash,
                             dataset=DatasetInfo(id=dataset_id, name=dataset_name),
                         ),
                         "task": TaskInfo(

@@ -9,32 +9,36 @@ from .compare import (
     print_comparison_report,
 )
 from .reporter import DefaultReporter, build_report_header
-from .stats import calculate_evaluator_stats, calculate_overall_stats, get_unique_evaluator_names
+from .stats import (
+    calculate_overall_stats,
+    get_unique_datasets,
+    get_unique_evaluator_names,
+)
 from .table import create_report_table
 from .types import (
-    DatasetScore,
-    DatasetScoreWithStats,
     EvaluationReport,
     EvaluatorDisplayGroup,
     EvaluatorDisplayOptions,
     EvaluatorStats,
     ReportDisplayOptions,
+    RunStats,
+    StatsDisplay,
 )
 
 __all__ = [
-    "DatasetScore",
-    "DatasetScoreWithStats",
     "DefaultReporter",
     "EvaluationReport",
     "EvaluatorDisplayGroup",
     "EvaluatorDisplayOptions",
     "EvaluatorStats",
     "ReportDisplayOptions",
+    "RunStats",
+    "StatsDisplay",
     "PairedTTestResult",
     "PairingResult",
     "build_report_header",
-    "calculate_evaluator_stats",
     "calculate_overall_stats",
+    "get_unique_datasets",
     "compare_runs",
     "compute_paired_t_test_results",
     "create_report_table",

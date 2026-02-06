@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Any
 
 import httpx
@@ -83,7 +84,9 @@ class PromptResponse(BaseModel):
         tool_calls = data.get("toolCalls") or data.get("tool_calls")
         parsed_tool_calls = None
         if isinstance(tool_calls, list):
-            parsed_tool_calls = [PromptToolCall.model_validate(item) for item in tool_calls]
+            parsed_tool_calls = [
+                PromptToolCall.model_validate(item) for item in tool_calls
+            ]
 
         return cls(content=data.get("content"), tool_calls=parsed_tool_calls)
 
@@ -100,7 +103,10 @@ class KibanaInferenceError(RuntimeError):
 
 def _is_retryable_error(error: BaseException) -> bool:
     if isinstance(error, httpx.HTTPStatusError):
-        return error.response.status_code in {408, 429} or error.response.status_code >= 500
+        return (
+            error.response.status_code in {408, 429}
+            or error.response.status_code >= 500
+        )
     if isinstance(error, httpx.HTTPError):
         return True
     if isinstance(error, KibanaInferenceError):
@@ -113,12 +119,10 @@ class KibanaInferenceClient:
         self,
         kibana_url: str,
         connector_id: str,
-        auth: str,
         timeout: float = 120.0,
     ) -> None:
         self.kibana_url = kibana_url.rstrip("/")
         self.connector_id = connector_id
-        self.auth = auth
         self.timeout = timeout
 
     @retry(
@@ -158,8 +162,8 @@ class KibanaInferenceClient:
 
         headers = {
             "kbn-xsrf": "true",
-            "Authorization": f"Basic {self.auth}",
             "Content-Type": "application/json",
+            "x-elastic-internal-origin": "true",
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -167,8 +171,20 @@ class KibanaInferenceClient:
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as exc:
-                message = f"Kibana inference request failed with {exc.response.status_code}"
-                raise KibanaInferenceError(message, status_code=exc.response.status_code) from exc
+                detail: str | None = None
+                try:
+                    detail_payload = exc.response.json()
+                    detail = json.dumps(detail_payload, ensure_ascii=True)
+                except (ValueError, json.JSONDecodeError):
+                    detail = exc.response.text
+                message = (
+                    f"Kibana inference request failed with {exc.response.status_code}"
+                )
+                if detail:
+                    message = f"{message}: {detail}"
+                raise KibanaInferenceError(
+                    message, status_code=exc.response.status_code
+                ) from exc
 
             payload_data = response.json()
 
@@ -208,8 +224,8 @@ class KibanaInferenceClient:
 
         headers = {
             "kbn-xsrf": "true",
-            "Authorization": f"Basic {self.auth}",
             "Content-Type": "application/json",
+            "x-elastic-internal-origin": "true",
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -217,12 +233,24 @@ class KibanaInferenceClient:
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as exc:
+                detail: str | None = None
+                try:
+                    detail_payload = exc.response.json()
+                    detail = json.dumps(detail_payload, ensure_ascii=True)
+                except (ValueError, json.JSONDecodeError):
+                    detail = exc.response.text
                 message = f"Kibana inference prompt request failed with {exc.response.status_code}"
-                raise KibanaInferenceError(message, status_code=exc.response.status_code) from exc
+                if detail:
+                    message = f"{message}: {detail}"
+                raise KibanaInferenceError(
+                    message, status_code=exc.response.status_code
+                ) from exc
             payload_data = response.json()
 
         if isinstance(payload_data, dict) and payload_data.get("type") == "error":
-            message = payload_data.get("message") or "Kibana inference prompt request failed"
+            message = (
+                payload_data.get("message") or "Kibana inference prompt request failed"
+            )
             raise KibanaInferenceError(message)
 
         return PromptResponse.from_kibana_response(payload_data)

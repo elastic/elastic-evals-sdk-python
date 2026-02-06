@@ -26,7 +26,9 @@ def _validate_positive_int(value: int | None, name: str) -> int | None:
     return value
 
 
-def _apply_overrides(overrides: dict[str, str], env: dict[str, str], keys: Iterable[str]) -> None:
+def _apply_overrides(
+    overrides: dict[str, str], env: dict[str, str], keys: Iterable[str]
+) -> None:
     for key in keys:
         if key in overrides:
             env[key] = overrides[key]
@@ -49,8 +51,14 @@ def _temporary_env(overrides: dict[str, str]) -> Iterable[None]:
 
 
 @click.command("run")
-@click.argument("script", required=False, type=click.Path(exists=True, dir_okay=False, readable=True))
-@click.option("--suite", help="Suite ID registered via elastic_evals.suites entry points.")
+@click.argument(
+    "script",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+)
+@click.option(
+    "--suite", help="Suite ID registered via elastic_evals.suites entry points."
+)
 @click.option("--run-id", help="Override run ID used by elastic-evals.")
 @click.option("--repetitions", "-r", type=int, help="Number of repetitions.")
 @click.option("--concurrency", "-c", type=int, help="Concurrency level.")
@@ -59,7 +67,6 @@ def _temporary_env(overrides: dict[str, str]) -> Iterable[None]:
 @click.option("--kibana-url", help="Kibana base URL.")
 @click.option("--connector-id", help="Kibana connector ID for tasks.")
 @click.option("--evaluation-connector-id", help="Connector ID for evaluator LLMs.")
-@click.option("--kibana-auth", help="Kibana auth, base64-encoded.")
 @click.option("--log-level", help="Log level (DEBUG, INFO, WARNING, ERROR).")
 @click.option(
     "--tracing-exporter",
@@ -83,7 +90,6 @@ def run_cmd(
     kibana_url: str | None,
     connector_id: str | None,
     evaluation_connector_id: str | None,
-    kibana_auth: str | None,
     log_level: str | None,
     tracing_exporter: str | None,
     tracing_endpoint: str | None,
@@ -112,8 +118,6 @@ def run_cmd(
         overrides["CONNECTOR_ID"] = connector_id
     if evaluation_connector_id:
         overrides["EVALUATION_CONNECTOR_ID"] = evaluation_connector_id
-    if kibana_auth:
-        overrides["KIBANA_AUTH"] = kibana_auth
     if log_level:
         overrides["ELASTIC_EVALS_LOG_LEVEL"] = log_level.upper()
     if tracing_exporter:

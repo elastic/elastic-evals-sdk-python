@@ -16,7 +16,6 @@ class DatasetInfo(BaseModel):
 class ExampleInfo(BaseModel):
     id: str
     index: int
-    input_hash: str
     dataset: DatasetInfo
 
 

@@ -5,122 +5,64 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 
-import numpy as np
-
-from elastic_evals.reporting.types import DatasetScore, DatasetScoreWithStats, EvaluatorStats
+from elastic_evals.reporting.types import EvaluatorStats, StatsDisplay
 
 
-def calculate_evaluator_stats(scores: list[float], total_examples: int) -> EvaluatorStats:
-    if not scores:
-        return EvaluatorStats(
-            mean=0.0,
-            median=0.0,
-            std_dev=0.0,
-            min=0.0,
-            max=0.0,
-            count=0,
-            percentage=0.0,
-        )
-
-    total_score = sum(scores)
-    std_dev = float(np.std(scores, ddof=1)) if len(scores) > 1 else 0.0
-    return EvaluatorStats(
-        mean=float(np.mean(scores)),
-        median=float(np.median(scores)),
-        std_dev=std_dev,
-        min=float(np.min(scores)),
-        max=float(np.max(scores)),
-        count=len(scores),
-        percentage=total_score / total_examples if total_examples > 0 else 0.0,
-    )
+def get_unique_evaluator_names(stats: Sequence[EvaluatorStats]) -> list[str]:
+    return sorted({entry.evaluator_name for entry in stats})
 
 
-def get_unique_evaluator_names(dataset_scores: Sequence[DatasetScore]) -> list[str]:
-    evaluator_names: set[str] = set()
-    for dataset in dataset_scores:
-        if dataset.evaluator_scores:
-            evaluator_names.update(dataset.evaluator_scores.keys())
-        elif hasattr(dataset, "evaluator_stats"):
-            evaluator_stats = getattr(dataset, "evaluator_stats", None)
-            if evaluator_stats:
-                evaluator_names.update(evaluator_stats.keys())
-    return sorted(evaluator_names)
+def get_unique_datasets(stats: Sequence[EvaluatorStats]) -> list[dict[str, str]]:
+    datasets = {(entry.dataset_id, entry.dataset_name) for entry in stats}
+    return [
+        {"id": dataset_id, "name": dataset_name}
+        for dataset_id, dataset_name in sorted(datasets)
+    ]
 
 
-def _pooled_variance(stats: list[EvaluatorStats], weighted_mean: float) -> float:
-    total_count = sum(item.count for item in stats)
-    if total_count <= 1:
-        return 0.0
-    numerator = sum(
-        (item.count - 1) * item.std_dev**2 + item.count * (item.mean - weighted_mean) ** 2
-        for item in stats
-    )
-    return numerator / (total_count - 1)
+def calculate_overall_stats(stats: Sequence[EvaluatorStats]) -> list[EvaluatorStats]:
+    overall_stats: list[EvaluatorStats] = []
+    evaluator_names = get_unique_evaluator_names(stats)
 
-
-def calculate_overall_stats(
-    dataset_scores: Sequence[DatasetScore | DatasetScoreWithStats],
-) -> dict[str, EvaluatorStats]:
-    overall_stats: dict[str, EvaluatorStats] = {}
-    total_examples = sum(dataset.num_examples for dataset in dataset_scores)
-
-    evaluator_names = get_unique_evaluator_names(dataset_scores)
     for evaluator_name in evaluator_names:
-        all_scores: list[float] = []
-        total_score = 0.0
-        for dataset in dataset_scores:
-            scores = dataset.evaluator_scores.get(evaluator_name, [])
-            if scores:
-                all_scores.extend(scores)
-                total_score += sum(scores)
+        evaluator_stats = [
+            entry for entry in stats if entry.evaluator_name == evaluator_name
+        ]
+        total_count = sum(entry.stats.count for entry in evaluator_stats)
 
-        if all_scores:
-            std_dev = float(np.std(all_scores, ddof=1)) if len(all_scores) > 1 else 0.0
-            overall_stats[evaluator_name] = EvaluatorStats(
-                mean=float(np.mean(all_scores)),
-                median=float(np.median(all_scores)),
-                std_dev=std_dev,
-                min=float(np.min(all_scores)),
-                max=float(np.max(all_scores)),
-                count=len(all_scores),
-                percentage=total_score / total_examples if total_examples > 0 else 0.0,
-            )
-            continue
-
-        stats_by_dataset: list[EvaluatorStats] = []
-        for dataset in dataset_scores:
-            evaluator_stats = getattr(dataset, "evaluator_stats", None) or {}
-            stats = evaluator_stats.get(evaluator_name)
-            if stats and stats.count > 0:
-                stats_by_dataset.append(stats)
-
-        if not stats_by_dataset:
-            overall_stats[evaluator_name] = EvaluatorStats(
-                mean=0.0,
-                median=0.0,
-                std_dev=0.0,
-                min=0.0,
-                max=0.0,
-                count=0,
-                percentage=0.0,
-            )
-            continue
-
-        total_count = sum(item.count for item in stats_by_dataset)
         weighted_mean = (
-            sum(item.mean * item.count for item in stats_by_dataset) / total_count
+            sum(entry.stats.mean * entry.stats.count for entry in evaluator_stats)
+            / total_count
             if total_count > 0
             else 0.0
         )
-        pooled_variance = _pooled_variance(stats_by_dataset, weighted_mean)
-        overall_stats[evaluator_name] = EvaluatorStats(
-            mean=weighted_mean,
-            median=weighted_mean,
-            std_dev=math.sqrt(pooled_variance),
-            min=min(item.min for item in stats_by_dataset),
-            max=max(item.max for item in stats_by_dataset),
-            count=total_count,
-            percentage=(weighted_mean * total_count) / total_examples if total_examples > 0 else 0.0,
+
+        if total_count <= 1:
+            pooled_variance = 0.0
+        else:
+            pooled_variance = sum(
+                (entry.stats.count - 1) * entry.stats.std_dev**2
+                + entry.stats.count * (entry.stats.mean - weighted_mean) ** 2
+                for entry in evaluator_stats
+            ) / (total_count - 1)
+
+        min_value = min((entry.stats.min for entry in evaluator_stats), default=0.0)
+        max_value = max((entry.stats.max for entry in evaluator_stats), default=0.0)
+
+        overall_stats.append(
+            EvaluatorStats(
+                dataset_id="overall",
+                dataset_name="Overall",
+                evaluator_name=evaluator_name,
+                stats=StatsDisplay(
+                    mean=weighted_mean,
+                    median=weighted_mean,
+                    std_dev=math.sqrt(pooled_variance),
+                    min=min_value,
+                    max=max_value,
+                    count=total_count,
+                ),
+            )
         )
 
     return overall_stats

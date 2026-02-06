@@ -1,4 +1,4 @@
-"""Agent Builder suite plugin."""
+"""Phoenix evaluation suite plugin."""
 
 from __future__ import annotations
 
@@ -16,17 +16,17 @@ def _require_env(name: str) -> None:
         raise RuntimeError(f'Missing required env var "{name}".')
 
 
-def _run_agent_builder() -> None:
+def _run_phoenix_eval() -> None:
     _require_env("CONNECTOR_ID")
     script_path = Path(__file__).resolve().parent / "run.py"
     if not script_path.is_file():
-        raise RuntimeError("Agent Builder script not found.")
+        raise RuntimeError("Phoenix eval script not found.")
     subprocess.run([sys.executable, str(script_path)], check=True)
 
 
 def get_suite() -> EvaluationSuite:
     return EvaluationSuite(
-        id="agent-builder",
-        description="Agent Builder evaluation suite (examples/agent_builder/run.py).",
-        run=_run_agent_builder,
+        id="phoenix-eval",
+        description="Phoenix evaluation suite (examples/phoenix_eval/run.py).",
+        run=_run_phoenix_eval,
     )
