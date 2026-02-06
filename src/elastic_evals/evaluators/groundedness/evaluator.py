@@ -10,7 +10,7 @@ from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential
 
 from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.evaluators.filter import parse_selected_evaluators
-from elastic_evals.evaluators.groundedness.prompt import PROMPT, render_user_prompt, tool_choice
+from elastic_evals.evaluators.groundedness.prompt import PROMPT, tool_choice
 from elastic_evals.evaluators.groundedness.scoring import calculate_groundedness_score
 from elastic_evals.evaluators.groundedness.types import GroundednessAnalysis
 from elastic_evals.inference import KibanaInferenceClient
@@ -24,13 +24,20 @@ def _should_run_groundedness_analysis() -> bool:
     selected = parse_selected_evaluators()
     if not selected:
         return True
-    return QUALITATIVE_EVALUATOR_NAME in selected or QUANTITATIVE_EVALUATOR_NAME in selected
+    return (
+        QUALITATIVE_EVALUATOR_NAME in selected
+        or QUANTITATIVE_EVALUATOR_NAME in selected
+    )
 
 
 def _parse_tool_arguments(tool_call: Any) -> dict[str, Any]:
     if not tool_call or not tool_call.function:
         raise ValueError("No tool call found in LLM response")
-    arguments = tool_call.function.get("arguments") if isinstance(tool_call.function, dict) else None
+    arguments = (
+        tool_call.function.get("arguments")
+        if isinstance(tool_call.function, dict)
+        else None
+    )
     if arguments is None:
         raise ValueError("No tool arguments found in LLM response")
     if isinstance(arguments, str):
@@ -82,7 +89,9 @@ def create_groundedness_analysis_evaluator(
             return GroundednessAnalysis.model_validate(analysis_payload)
 
         try:
-            groundedness_analysis = await _run_with_retries(log, run_analysis, "groundedness analysis")
+            groundedness_analysis = await _run_with_retries(
+                log, run_analysis, "groundedness analysis"
+            )
         except Exception as exc:
             log.error(
                 "Failed to retrieve groundedness analysis after retries (no valid tool call or malformed response)",
@@ -98,7 +107,9 @@ def create_groundedness_analysis_evaluator(
             metadata=groundedness_analysis.model_dump(),
         )
 
-    return SimpleEvaluator(name=QUALITATIVE_EVALUATOR_NAME, kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(
+        name=QUALITATIVE_EVALUATOR_NAME, kind="LLM", evaluate=evaluate
+    )
 
 
 def create_quantitative_groundedness_evaluator() -> Evaluator:
@@ -112,7 +123,9 @@ def create_quantitative_groundedness_evaluator() -> Evaluator:
                 metadata=params.metadata or None,
             )
 
-        groundedness_analysis = GroundednessAnalysis.model_validate(groundedness_analysis_data)
+        groundedness_analysis = GroundednessAnalysis.model_validate(
+            groundedness_analysis_data
+        )
         score = calculate_groundedness_score(groundedness_analysis)
         summary_text = groundedness_analysis.summary_verdict
         return EvaluationResult(
@@ -122,4 +135,6 @@ def create_quantitative_groundedness_evaluator() -> Evaluator:
             metadata=params.metadata or None,
         )
 
-    return SimpleEvaluator(name=QUANTITATIVE_EVALUATOR_NAME, kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(
+        name=QUANTITATIVE_EVALUATOR_NAME, kind="LLM", evaluate=evaluate
+    )

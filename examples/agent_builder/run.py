@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from functools import partial
 from typing import Iterable
 
 from elasticsearch import AsyncElasticsearch
@@ -129,7 +128,9 @@ async def main() -> None:
     evaluator_names = [evaluator.name for evaluator in quantitative_evaluators]
     dataset_scores = [
         _build_dataset_scores_with_stats(
-            repetitions=config.repetitions, evaluator_names=evaluator_names, experiment=result
+            repetitions=config.repetitions,
+            evaluator_names=evaluator_names,
+            experiment=result,
         )
     ]
     reporter.report(
