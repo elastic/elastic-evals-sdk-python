@@ -146,7 +146,7 @@ class ElasticEvalsConfig(BaseModel):
     connector_id: str
     evaluator_connector_id: str | None = None
 
-    evaluations_es_url: str | None = None
+    evaluations_es_url: str
     trace_es_url: str | None = None
 
     tracing: TracingConfig = Field(default_factory=TracingConfig)
@@ -173,7 +173,7 @@ class ElasticEvalsConfig(BaseModel):
         kibana_url = os.environ.get("KIBANA_URL", "http://localhost:5601")
         connector_id = _get_required_env("CONNECTOR_ID")
         evaluator_connector_id = os.environ.get("EVALUATION_CONNECTOR_ID")
-        evaluations_es_url = os.environ.get("EVALUATIONS_ES_URL")
+        evaluations_es_url = _get_required_env("EVALUATIONS_ES_URL")
         trace_es_url = os.environ.get("TRACE_ES_URL")
 
         log_level = os.environ.get("ELASTIC_EVALS_LOG_LEVEL", "INFO").upper()

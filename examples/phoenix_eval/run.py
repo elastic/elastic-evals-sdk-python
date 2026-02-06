@@ -39,6 +39,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 from elasticsearch import AsyncElasticsearch
 
@@ -100,6 +101,16 @@ def _load_dotenv() -> None:
         print(f"Warning: python-dotenv not installed. Cannot load {env_path}")
         print("  Install with: uv add python-dotenv")
         print("  Or: pip install python-dotenv")
+
+
+def _sanitize_url(url: str) -> str:
+    """Strip credentials from a URL for safe logging."""
+    parsed = urlparse(url)
+    if parsed.username:
+        host = parsed.hostname or ""
+        netloc = f"***@{host}:{parsed.port}" if parsed.port else f"***@{host}"
+        return urlunparse(parsed._replace(netloc=netloc))
+    return url
 
 
 # =============================================================================
@@ -363,7 +374,7 @@ async def main() -> None:
     print(f"Loading dataset from Phoenix: {phoenix_dataset_name}")
 
     phoenix_config = PhoenixDatasetConfig.from_env()
-    print(f"  Phoenix URL: {phoenix_config.base_url}")
+    print(f"  Phoenix URL: {_sanitize_url(phoenix_config.base_url)}")
 
     try:
         dataset = load_dataset_from_phoenix(
@@ -440,7 +451,9 @@ async def main() -> None:
     print()
 
     # 8. Export to Elasticsearch
-    print(f"Exporting scores to Elasticsearch: {config.evaluations_es_url}")
+    print(
+        f"Exporting scores to Elasticsearch: {_sanitize_url(config.evaluations_es_url)}"
+    )
     es = AsyncElasticsearch(config.evaluations_es_url)
     repository = EvaluationScoreRepository(es, log)
 

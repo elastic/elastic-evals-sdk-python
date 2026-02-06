@@ -131,7 +131,7 @@ Results are stored in `RanExperiment`.
 | `KIBANA_URL`                              | Kibana base URL                                         | No       | `http://localhost:5601`           |
 | `CONNECTOR_ID`                            | Kibana connector ID for tasks                           | Yes      | -                                 |
 | `EVALUATION_CONNECTOR_ID`                 | Connector ID for evaluator LLMs                         | No       | -                                 |
-| `EVALUATIONS_ES_URL`                      | Elasticsearch URL for scores                            | No       | -                                 |
+| `EVALUATIONS_ES_URL`                      | Elasticsearch URL for scores                            | Yes      | -                                 |
 | `TRACE_ES_URL`                            | Elasticsearch URL for traces                            | No       | -                                 |
 | `ELASTIC_EVALS_RUN_ID`                    | Override run ID                                         | No       | UUID                              |
 | `ELASTIC_EVALS_REPETITIONS`               | Number of repetitions                                   | No       | `3`                               |
