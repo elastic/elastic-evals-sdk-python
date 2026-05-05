@@ -30,6 +30,7 @@ elastic-evals = "elastic_evals.runner.cli.main:main"
 
 [project.entry-points."elastic_evals.suites"]
 agent-builder = "examples.agent_builder.suite_plugin:get_suite"
+chatbot-rag-eval-example = "examples.chatbot_rag_app.suite_plugin:get_suite"
 
 [build-system]
 requires = ["hatchling"]

@@ -13,7 +13,7 @@ from elastic_evals.types import EvaluationDataset, EvaluationResult, Example
 
 @pytest.mark.asyncio
 async def test_runner_end_to_end() -> None:
-    dataset = EvaluationDataset(
+    dataset: EvaluationDataset[Example[dict[str, str], None, None]] = EvaluationDataset(
         name="tiny",
         description="tiny dataset",
         examples=[

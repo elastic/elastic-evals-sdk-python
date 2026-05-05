@@ -212,6 +212,7 @@ elastic-evals run --suite agent-builder \
 ## Examples
 
 - [Agent Builder](examples/agent_builder/) - Evaluate Agent Builder responses
+- [Chatbot RAG App](examples/chatbot_rag_app/) - Evaluate the Dockerized chatbot-rag-app with criteria and source-citation scoring
 
 ## Development
 
