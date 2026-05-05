@@ -16,7 +16,11 @@ from elastic_evals.evaluators.rag.metrics import (
     filter_docs_by_ground_truth_indices,
     get_relevant_docs,
 )
-from elastic_evals.evaluators.rag.types import GroundTruth, RagEvaluatorConfig, RetrievedDoc
+from elastic_evals.evaluators.rag.types import (
+    GroundTruth,
+    RagEvaluatorConfig,
+    RetrievedDoc,
+)
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
 
 TOutput = TypeVar("TOutput")
@@ -76,7 +80,9 @@ def _compute_rag_metrics(
 
     all_retrieved_docs: list[RetrievedDoc] = config.extract_retrieved_docs(output)
     if _should_filter_by_ground_truth_indices(config):
-        all_retrieved_docs = filter_docs_by_ground_truth_indices(all_retrieved_docs, ground_truth)
+        all_retrieved_docs = filter_docs_by_ground_truth_indices(
+            all_retrieved_docs, ground_truth
+        )
 
     top_k_docs = all_retrieved_docs[:k]
     relevant_in_top_k = get_relevant_docs(top_k_docs, ground_truth, threshold)
@@ -126,7 +132,9 @@ def create_precision_at_k_evaluator(
             metadata={"hits": metrics.hits, "k": metrics.k},
         )
 
-    return SimpleEvaluator(name=PRECISION_EVALUATOR_NAME, kind="CODE", evaluate=evaluate)
+    return SimpleEvaluator(
+        name=PRECISION_EVALUATOR_NAME, kind="CODE", evaluate=evaluate
+    )
 
 
 def create_recall_at_k_evaluator(

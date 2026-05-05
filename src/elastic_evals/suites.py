@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import inspect
 from importlib import metadata
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Iterable
 
 
 SuiteRunner = Callable[[], Awaitable[None] | None]
@@ -41,11 +41,12 @@ def _normalize_suite(entry_name: str, value: object) -> EvaluationSuite:
 def discover_suites() -> SuiteDiscoveryResult:
     suites: list[EvaluationSuite] = []
     errors: list[str] = []
+    entry_points: Iterable[metadata.EntryPoint]
 
     try:
         entry_points = metadata.entry_points(group="elastic_evals.suites")
     except TypeError:
-        entry_points = metadata.entry_points().get("elastic_evals.suites", [])
+        entry_points = metadata.entry_points().get("elastic_evals.suites", ())
 
     for entry in entry_points:
         try:

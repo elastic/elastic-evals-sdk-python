@@ -211,7 +211,7 @@ Now, perform the analysis on the following inputs.
 [Agent Response]:
 {{{agent_response}}}"""
 
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -269,7 +269,11 @@ TOOLS = [
                                             "description": "A direct snippet from the tool result or null.",
                                         },
                                     },
-                                    "required": ["tool_call_id", "tool_id", "evidence_snippet"],
+                                    "required": [
+                                        "tool_call_id",
+                                        "tool_id",
+                                        "evidence_snippet",
+                                    ],
                                     "description": "Evidence supporting the verdict from tool calls.",
                                 },
                                 "explanation": {
@@ -326,7 +330,9 @@ PROMPT = {
 }
 
 
-def render_user_prompt(user_query: str, agent_response: str, tool_call_history: str) -> str:
+def render_user_prompt(
+    user_query: str, agent_response: str, tool_call_history: str
+) -> str:
     return (
         USER_PROMPT.replace("{{{user_query}}}", user_query)
         .replace("{{{agent_response}}}", agent_response)

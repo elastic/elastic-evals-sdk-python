@@ -19,10 +19,12 @@ TaskOutput: TypeAlias = Any
 class Example(BaseModel, Generic[TInput, TExpected, TMetadata]):
     input: TInput
     output: TExpected | None = None
-    metadata: TMetadata = None
+    metadata: TMetadata | None = None
 
 
-class ExampleWithId(Example[TInput, TExpected, TMetadata], Generic[TInput, TExpected, TMetadata]):
+class ExampleWithId(
+    Example[TInput, TExpected, TMetadata], Generic[TInput, TExpected, TMetadata]
+):
     id: str
 
 

@@ -43,7 +43,9 @@ def calculate_relevance_score(correctness_evaluation: CorrectnessAnalysis) -> fl
     return central_claims / num_claims
 
 
-def calculate_procedural_fidelity_score(correctness_evaluation: CorrectnessAnalysis) -> float:
+def calculate_procedural_fidelity_score(
+    correctness_evaluation: CorrectnessAnalysis,
+) -> float:
     summary = correctness_evaluation.summary
     analysis = correctness_evaluation.analysis
 

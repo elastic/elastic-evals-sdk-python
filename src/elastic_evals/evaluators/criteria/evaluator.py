@@ -17,7 +17,10 @@ from elastic_evals.evaluators.criteria.prompt import (
     tool_choice,
 )
 from elastic_evals.evaluators.criteria.short_id_table import ShortIdTable
-from elastic_evals.evaluators.criteria.types import EvaluationCriterion, EvaluationCriterionStructured
+from elastic_evals.evaluators.criteria.types import (
+    EvaluationCriterion,
+    EvaluationCriterionStructured,
+)
 from elastic_evals.inference import KibanaInferenceClient
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
 
@@ -31,7 +34,11 @@ def _normalize_scores(value: float) -> float:
 def _parse_tool_arguments(tool_call: Any) -> dict[str, Any]:
     if not tool_call or not tool_call.function:
         raise ValueError("No tool call found in LLM response")
-    arguments = tool_call.function.get("arguments") if isinstance(tool_call.function, dict) else None
+    arguments = (
+        tool_call.function.get("arguments")
+        if isinstance(tool_call.function, dict)
+        else None
+    )
     if arguments is None:
         raise ValueError("No tool arguments found in LLM response")
     if isinstance(arguments, str):
@@ -42,9 +49,10 @@ def _parse_tool_arguments(tool_call: Any) -> dict[str, Any]:
 
 
 def _ensure_scores(
-    evaluated: Iterable[dict[str, Any]], criteria_by_id: dict[str, EvaluationCriterionStructured]
+    evaluated: Iterable[dict[str, Any]],
+    criteria_by_id: dict[str, EvaluationCriterionStructured],
 ) -> list[tuple[EvaluationCriterionStructured, dict[str, Any]]]:
-    unique = {}
+    unique: dict[str, dict[str, Any]] = {}
     for evaluation in evaluated:
         unique.setdefault(evaluation["id"], evaluation)
 
@@ -75,7 +83,9 @@ def create_criteria_evaluator(
     for criterion in criteria or []:
         if isinstance(criterion, str):
             structured_criteria.append(
-                EvaluationCriterionStructured(id=table.take(criterion), text=criterion, score=1)
+                EvaluationCriterionStructured(
+                    id=table.take(criterion), text=criterion, score=1
+                )
             )
         else:
             structured_criteria.append(
@@ -87,9 +97,14 @@ def create_criteria_evaluator(
     criteria_by_id = {criterion.id: criterion for criterion in structured_criteria}
 
     async def evaluate(params: EvaluatorParams) -> EvaluationResult:
-        async def score_task() -> list[tuple[EvaluationCriterionStructured, dict[str, Any]]]:
+        async def score_task() -> (
+            list[tuple[EvaluationCriterionStructured, dict[str, Any]]]
+        ):
             system_prompt = render_system_prompt(
-                [f"{criterion.id}: {criterion.text}" for criterion in structured_criteria]
+                [
+                    f"{criterion.id}: {criterion.text}"
+                    for criterion in structured_criteria
+                ]
             )
             user_prompt = render_user_prompt(
                 input_text=json.dumps(params.input),
@@ -132,10 +147,12 @@ def create_criteria_evaluator(
         not_applicable = [item for item in scores if item[1]["result"] == "N/A"]
 
         max_score = sum(criterion.score or 0 for criterion in structured_criteria)
-        total_score = sum((criterion.score or 0) for criterion, _ in successful + not_applicable)
+        total_score = sum(
+            (criterion.score or 0) for criterion, _ in successful + not_applicable
+        )
 
         explanation = "\n".join(
-            f"\"{criterion.id}\": {evaluation.get('reason') or 'No explanation given'}"
+            f'"{criterion.id}": {evaluation.get("reason") or "No explanation given"}'
             for criterion, evaluation in scores
         )
 
@@ -144,9 +161,13 @@ def create_criteria_evaluator(
             label=None,
             explanation=explanation,
             metadata={
-                "successful": sum((criterion.score or 0) for criterion, _ in successful),
+                "successful": sum(
+                    (criterion.score or 0) for criterion, _ in successful
+                ),
                 "failed": sum((criterion.score or 0) for criterion, _ in failed),
-                "not_applicable": sum((criterion.score or 0) for criterion, _ in not_applicable),
+                "not_applicable": sum(
+                    (criterion.score or 0) for criterion, _ in not_applicable
+                ),
             },
         )
 

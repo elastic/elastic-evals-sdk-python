@@ -271,7 +271,7 @@ Now, perform the analysis on the following inputs.
 {{{agent_response}}}
 ```"""
 
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -286,12 +286,20 @@ TOOLS = [
                             "factual_accuracy_summary": {
                                 "type": "string",
                                 "description": "Overall factual accuracy assessment.",
-                                "enum": ["ACCURATE", "MINOR_INACCURACIES", "MAJOR_INACCURACIES"],
+                                "enum": [
+                                    "ACCURATE",
+                                    "MINOR_INACCURACIES",
+                                    "MAJOR_INACCURACIES",
+                                ],
                             },
                             "relevance_summary": {
                                 "type": "string",
                                 "description": "Overall relevance assessment of the response.",
-                                "enum": ["RELEVANT", "PARTIALLY_RELEVANT", "IRRELEVANT"],
+                                "enum": [
+                                    "RELEVANT",
+                                    "PARTIALLY_RELEVANT",
+                                    "IRRELEVANT",
+                                ],
                             },
                             "sequence_accuracy_summary": {
                                 "type": "string",
@@ -389,7 +397,9 @@ PROMPT = {
 }
 
 
-def render_user_prompt(user_query: str, agent_response: str, ground_truth_response: str) -> str:
+def render_user_prompt(
+    user_query: str, agent_response: str, ground_truth_response: str
+) -> str:
     return (
         USER_PROMPT.replace("{{{user_query}}}", user_query)
         .replace("{{{agent_response}}}", agent_response)

@@ -102,7 +102,9 @@ def create_trace_based_evaluator(
                 with attempt:
                     return EvaluationResult(score=await fetch_stats())
         except Exception as error:
-            logger.error("Failed to evaluate %s for trace %s: %s", config.name, trace_id, error)
+            logger.error(
+                "Failed to evaluate %s for trace %s: %s", config.name, trace_id, error
+            )
             return EvaluationResult(
                 label="error",
                 explanation=f"Failed to retrieve {config.name}: {error}",

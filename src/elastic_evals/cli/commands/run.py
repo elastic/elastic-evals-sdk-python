@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 from contextlib import contextmanager
-from typing import Iterable
+from typing import Iterable, Iterator
 
 import click
 
@@ -35,7 +35,7 @@ def _apply_overrides(
 
 
 @contextmanager
-def _temporary_env(overrides: dict[str, str]) -> Iterable[None]:
+def _temporary_env(overrides: dict[str, str]) -> Iterator[None]:
     original: dict[str, str | None] = {}
     for key, value in overrides.items():
         original[key] = os.environ.get(key)
@@ -43,11 +43,11 @@ def _temporary_env(overrides: dict[str, str]) -> Iterable[None]:
     try:
         yield
     finally:
-        for key, value in original.items():
-            if value is None:
+        for key, original_value in original.items():
+            if original_value is None:
                 os.environ.pop(key, None)
             else:
-                os.environ[key] = value
+                os.environ[key] = original_value
 
 
 @click.command("run")
@@ -142,15 +142,16 @@ def run_cmd(
             raise click.ClickException(f'Unknown suite "{suite}".')
         try:
             with _temporary_env(overrides):
-                result = suite_def.run()
-                if asyncio.iscoroutine(result):
-                    asyncio.run(result)
+                suite_result = suite_def.run()
+                if asyncio.iscoroutine(suite_result):
+                    asyncio.run(suite_result)
         except Exception as exc:
             raise click.ClickException(str(exc)) from exc
         return
 
+    assert script is not None
     command = [sys.executable, script]
     env = os.environ.copy()
     _apply_overrides(overrides, env, overrides.keys())
-    result = subprocess.run(command, env=env)
-    raise SystemExit(result.returncode)
+    process_result = subprocess.run(command, env=env)
+    raise SystemExit(process_result.returncode)

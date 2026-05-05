@@ -14,7 +14,9 @@ class GitMetadata:
 
 def _try_git_command(command: str) -> str | None:
     try:
-        result = run(command, shell=True, check=True, stdout=PIPE, stderr=PIPE, text=True)
+        result = run(
+            command, shell=True, check=True, stdout=PIPE, stderr=PIPE, text=True
+        )
         return result.stdout.strip() or None
     except CalledProcessError:
         return None

@@ -84,7 +84,7 @@ USER_PROMPT = """Here is the example to evaluate:
 Please review the output against each of the criteria provided in the system instructions and respond by invoking the `score` tool.
 """
 
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {

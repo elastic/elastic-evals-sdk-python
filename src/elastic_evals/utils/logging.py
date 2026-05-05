@@ -28,7 +28,9 @@ def setup_logging(level: str = "INFO") -> logging.Logger:
 log = setup_logging()
 
 
-def log_experiment_start(run_id: str, dataset_name: str, evaluator_count: int, concurrency: int) -> None:
+def log_experiment_start(
+    run_id: str, dataset_name: str, evaluator_count: int, concurrency: int
+) -> None:
     log.info(
         '🧪 Starting experiment "Run ID: %s - Dataset: %s" with %s evaluators and %s concurrent runs',
         run_id,
@@ -47,7 +49,9 @@ def log_task_execution(dataset_id: str, example_index: int, repetition: int) -> 
     )
 
 
-def log_evaluation_start(example_index: int, repetition: int, evaluator_count: int) -> None:
+def log_evaluation_start(
+    example_index: int, repetition: int, evaluator_count: int
+) -> None:
     log.info(
         "🧠 Evaluating run (exampleIndex=%s, repetition=%s) with %s evaluators",
         example_index,
@@ -56,7 +60,9 @@ def log_evaluation_start(example_index: int, repetition: int, evaluator_count: i
     )
 
 
-def log_evaluator_start(evaluator_name: str, example_index: int, repetition: int) -> None:
+def log_evaluator_start(
+    evaluator_name: str, example_index: int, repetition: int
+) -> None:
     log.info(
         '🧠 Evaluating run (exampleIndex=%s, repetition=%s) with evaluator "%s"',
         example_index,
@@ -65,7 +71,9 @@ def log_evaluator_start(evaluator_name: str, example_index: int, repetition: int
     )
 
 
-def log_evaluator_complete(evaluator_name: str, example_index: int, repetition: int) -> None:
+def log_evaluator_complete(
+    evaluator_name: str, example_index: int, repetition: int
+) -> None:
     log.info(
         '✅ Evaluator "%s" on run (exampleIndex=%s, repetition=%s) completed',
         evaluator_name,
@@ -89,7 +97,7 @@ def log_export_success() -> None:
 def log_export_query_hint(hostname: str, model_id: str | None, run_id: str) -> None:
     model_filter = f'task.model.id:"{model_id}"' if model_id else "task.model.id:*"
     log.info(
-        "You can query the data using: environment.hostname:\"%s\" AND %s AND run_id:\"%s\"",
+        'You can query the data using: environment.hostname:"%s" AND %s AND run_id:"%s"',
         hostname,
         model_filter,
         run_id,

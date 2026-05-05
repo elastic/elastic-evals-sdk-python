@@ -22,21 +22,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-phoenix = [
-    "arize-phoenix-client>=1.0",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
-    "python-dotenv>=1.0",
-    "pandas>=2.0",
-]
 dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "pre-commit"]
-all = ["elastic-evals[phoenix,dev]"]
+all = ["elastic-evals[dev]"]
 
 [project.scripts]
 elastic-evals = "elastic_evals.cli:main"
 
 [project.entry-points."elastic_evals.suites"]
 agent-builder = "examples.agent_builder.suite_plugin:get_suite"
-phoenix-eval = "examples.phoenix_eval.suite_plugin:get_suite"
 
 [build-system]
 requires = ["hatchling"]

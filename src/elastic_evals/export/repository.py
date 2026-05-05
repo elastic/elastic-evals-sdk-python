@@ -129,9 +129,12 @@ class EvaluationScoreRepository:
 
     async def ensure_index_template(self) -> None:
         template_body = _build_index_template()
+        exists: bool
         try:
-            exists = await self._es.indices.exists_index_template(
-                name=EVALUATIONS_DATA_STREAM_TEMPLATE
+            exists = bool(
+                await self._es.indices.exists_index_template(
+                    name=EVALUATIONS_DATA_STREAM_TEMPLATE
+                )
             )
         except Exception:
             exists = False
@@ -376,8 +379,8 @@ def build_flattened_score_documents(
 
             evaluator_result = eval_run.result or EvaluationResult()
             documents.append(
-                EvaluationScoreDocument(
-                    **{
+                EvaluationScoreDocument.model_validate(
+                    {
                         "@timestamp": timestamp,
                         "run_id": run_id,
                         "experiment_id": experiment.id or "",

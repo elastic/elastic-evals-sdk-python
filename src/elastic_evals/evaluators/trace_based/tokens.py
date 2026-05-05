@@ -24,7 +24,11 @@ def _extract_column_value(response, column_name: str) -> float:
         return 0.0
     row = values[0]
     column_index = next(
-        (index for index, column in enumerate(columns) if column.get("name") == column_name),
+        (
+            index
+            for index, column in enumerate(columns)
+            if column.get("name") == column_name
+        ),
         None,
     )
     if column_index is None:
@@ -44,7 +48,9 @@ def create_input_tokens_evaluator(
         config=TraceBasedEvaluatorConfig(
             name="Input Tokens",
             build_query=build_input_tokens_query,
-            extract_result=lambda response: _extract_column_value(response, "input_tokens"),
+            extract_result=lambda response: _extract_column_value(
+                response, "input_tokens"
+            ),
         ),
     )
 
@@ -60,7 +66,9 @@ def create_output_tokens_evaluator(
         config=TraceBasedEvaluatorConfig(
             name="Output Tokens",
             build_query=build_output_tokens_query,
-            extract_result=lambda response: _extract_column_value(response, "output_tokens"),
+            extract_result=lambda response: _extract_column_value(
+                response, "output_tokens"
+            ),
         ),
     )
 
@@ -76,6 +84,8 @@ def create_cached_tokens_evaluator(
         config=TraceBasedEvaluatorConfig(
             name="Cached Tokens",
             build_query=build_cached_tokens_query,
-            extract_result=lambda response: _extract_column_value(response, "cached_tokens"),
+            extract_result=lambda response: _extract_column_value(
+                response, "cached_tokens"
+            ),
         ),
     )

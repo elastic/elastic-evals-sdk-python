@@ -210,3 +210,4 @@ __marimo__/
 # Cursor
 .cursor/
 AGENTS.md
+spec/
