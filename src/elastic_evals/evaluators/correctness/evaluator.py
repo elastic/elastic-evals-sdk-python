@@ -16,7 +16,6 @@ from elastic_evals.evaluators.correctness.scoring import (
     calculate_relevance_score,
 )
 from elastic_evals.evaluators.correctness.types import CorrectnessAnalysis
-from elastic_evals.evaluators.filter import parse_selected_evaluators
 from elastic_evals.inference import KibanaInferenceClient
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
 
@@ -24,21 +23,6 @@ QUALITATIVE_EVALUATOR_NAME = "Correctness Analysis"
 FACTUALITY_EVALUATOR_NAME = "Factuality"
 RELEVANCE_EVALUATOR_NAME = "Relevance"
 SEQUENCE_ACCURACY_EVALUATOR_NAME = "Sequence Accuracy"
-
-
-def _should_run_correctness_analysis() -> bool:
-    selected = parse_selected_evaluators()
-    if not selected:
-        return True
-    return any(
-        evaluator in selected
-        for evaluator in [
-            QUALITATIVE_EVALUATOR_NAME,
-            FACTUALITY_EVALUATOR_NAME,
-            RELEVANCE_EVALUATOR_NAME,
-            SEQUENCE_ACCURACY_EVALUATOR_NAME,
-        ]
-    )
 
 
 def _parse_tool_arguments(tool_call: Any) -> dict[str, Any]:
@@ -74,9 +58,6 @@ def create_correctness_analysis_evaluator(
     *, inference_client: KibanaInferenceClient, log: logging.Logger
 ) -> Evaluator:
     async def evaluate(params: EvaluatorParams) -> EvaluationResult:
-        if not _should_run_correctness_analysis():
-            return EvaluationResult()
-
         async def run_analysis() -> CorrectnessAnalysis:
             user_query = (params.input or {}).get("question")
             messages = (params.output or {}).get("messages") or []

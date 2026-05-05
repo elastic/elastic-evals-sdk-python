@@ -16,10 +16,11 @@ from elastic_evals.evaluators.groundedness import (
     create_quantitative_groundedness_evaluator,
 )
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.export import EvaluationScoreRepository
+from elastic_evals.export import (
+    EvaluationScoreRepository,
+    build_flattened_score_documents,
+)
 from elastic_evals.export.documents import ModelInfo
-from elastic_evals.export.repository import build_flattened_score_documents
-from elastic_evals.reporting import DefaultReporter
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluatorParams
 
@@ -93,18 +94,7 @@ async def main() -> None:
         total_repetitions=config.repetitions,
     )
     await repository.export_scores(documents)
-
-    run_stats = await repository.get_stats_by_run_id(config.run_id)
     await es.close()
-
-    if run_stats:
-        reporter = DefaultReporter()
-        reporter.report(
-            stats=run_stats.stats,
-            repetitions=run_stats.total_repetitions,
-            task_model=run_stats.task_model,
-            evaluator_model=run_stats.evaluator_model,
-        )
 
 
 if __name__ == "__main__":

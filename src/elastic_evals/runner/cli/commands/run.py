@@ -9,9 +9,9 @@ import sys
 from contextlib import contextmanager
 from typing import Iterable, Iterator
 
-import click
+import click  # type: ignore[import-not-found]
 
-from elastic_evals.suites import get_suite
+from elastic_evals.runner.suites import get_suite
 
 
 def _format_env_prefix(overrides: dict[str, str]) -> str:

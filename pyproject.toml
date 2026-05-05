@@ -10,7 +10,6 @@ requires-python = ">=3.11"
 license = "Elastic-2.0"
 dependencies = [
     "pydantic>=2.0",
-    "click>=8.0",
     "rich>=13.0",
     "elasticsearch>=8.0",
     "opentelemetry-api>=1.20",
@@ -23,10 +22,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "pre-commit"]
-all = ["elastic-evals[dev]"]
+runner = ["click>=8.0"]
+all = ["elastic-evals[dev,runner]"]
 
 [project.scripts]
-elastic-evals = "elastic_evals.cli:main"
+elastic-evals = "elastic_evals.runner.cli.main:main"
 
 [project.entry-points."elastic_evals.suites"]
 agent-builder = "examples.agent_builder.suite_plugin:get_suite"

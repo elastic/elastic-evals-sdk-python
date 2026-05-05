@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import click
+import click  # type: ignore[import-not-found]
 from rich.console import Console
 from rich.table import Table
 
-from elastic_evals.suites import discover_suites
+from elastic_evals.runner.suites import discover_suites
 
 
 def _find_examples_root() -> Path | None:

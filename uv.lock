@@ -295,7 +295,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
-    { name = "click" },
     { name = "elasticsearch" },
     { name = "httpx" },
     { name = "opentelemetry-api" },
@@ -308,6 +307,7 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "click" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -321,12 +321,15 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "ruff" },
 ]
+runner = [
+    { name = "click" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.3" },
-    { name = "click", specifier = ">=8.0" },
-    { name = "elastic-evals", extras = ["dev"], marker = "extra == 'all'" },
+    { name = "click", marker = "extra == 'runner'", specifier = ">=8.0" },
+    { name = "elastic-evals", extras = ["dev", "runner"], marker = "extra == 'all'" },
     { name = "elasticsearch", specifier = ">=8.0" },
     { name = "httpx", specifier = ">=0.25" },
     { name = "mypy", marker = "extra == 'dev'" },
@@ -341,7 +344,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "tenacity", specifier = ">=8.0" },
 ]
-provides-extras = ["dev", "all"]
+provides-extras = ["dev", "runner", "all"]
 
 [[package]]
 name = "elastic-transport"

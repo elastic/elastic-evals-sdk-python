@@ -10,19 +10,22 @@ to a Python-first workflow.
 ## Features
 
 - **Experiment runner** with configurable concurrency and repetitions
-- **Built-in evaluators** for correctness, groundedness, criteria, RAG metrics, and trace data
+- **Built-in evaluators** for correctness, groundedness, and criteria
 - **Elasticsearch export** to `.kibana-evaluations` datastreams
-- **OpenTelemetry tracing** with OTLP/HTTP exporter support
-- **Terminal reporting** with Rich tables
-- **CLI** for running suites, comparisons, and diagnostics
-- **Suite discovery plugins** via Python entry points
+- **OpenTelemetry tracing** with OTLP/HTTP endpoint configuration
+- **Optional CLI** (`elastic-evals[runner]`) for `run` and `list`
+- **Suite discovery plugins** via Python entry points in the runner package
 
 ## Installation
 
 ### Using pip
 
 ```bash
+# Core SDK
 pip install elastic-evals
+
+# SDK + CLI runner
+pip install "elastic-evals[runner]"
 ```
 
 ### Using uv (recommended)
@@ -104,8 +107,7 @@ that evaluators will score.
 Evaluators implement `evaluate()` and return an `EvaluationResult`. They can be:
 
 - **LLM** (LLM-as-judge): correctness, groundedness, criteria
-- **CODE** (deterministic): RAG metrics like Precision@K, Recall@K, F1@K
-- **Trace-based**: token usage, latency, tool calls (requires trace export + ES access)
+- **CODE** (deterministic): custom evaluators via `SimpleEvaluator`
 
 ### Experiment
 
@@ -124,7 +126,7 @@ Results are stored in `RanExperiment`.
 | `EVALUATIONS_ES_URL`                      | Elasticsearch URL for scores                            | Yes      | -                                 |
 | `TRACE_ES_URL`                            | Elasticsearch URL for traces                            | No       | -                                 |
 | `ELASTIC_EVALS_RUN_ID`                    | Override run ID                                         | No       | UUID                              |
-| `ELASTIC_EVALS_REPETITIONS`               | Number of repetitions                                   | No       | `3`                               |
+| `ELASTIC_EVALS_REPETITIONS`               | Number of repetitions                                   | No       | `1`                               |
 | `ELASTIC_EVALS_CONCURRENCY`               | Concurrency level                                       | No       | `5`                               |
 | `ELASTIC_EVALS_LOG_LEVEL`                 | Log level                                               | No       | `INFO`                            |
 | `ELASTIC_EVALS_MODEL`                     | JSON model metadata override                            | No       | -                                 |
@@ -132,47 +134,6 @@ Results are stored in `RanExperiment`.
 | `ELASTIC_EVALS_TRACING_EXPORTER`          | Tracing exporter (`otlp`, `console`, `none`)            | No       | `otlp`                            |
 | `ELASTIC_EVALS_TRACING_ENDPOINT`          | OTLP/HTTP endpoint                                      | No       | `http://localhost:4318/v1/traces` |
 | `ELASTIC_EVALS_TRACING_SERVICE_NAME`      | Tracing service name                                    | No       | `elastic-evals`                   |
-| `ELASTIC_EVALS_TRACING_TARGETS`           | Comma-separated exporters for multi-export              | No       | -                                 |
-| `ELASTIC_EVALS_TRACING_EXPORTERS`         | JSON array of exporter configs                          | No       | -                                 |
-| `SELECTED_EVALUATORS`                     | Comma-separated evaluator names                         | No       | -                                 |
-| `RAG_EVAL_K`                              | Override RAG K                                          | No       | -                                 |
-| `INDEX_FOCUSED_RAG_EVAL`                  | Restrict to ground-truth indices (`true`)               | No       | -                                 |
-
-## Multi-exporter tracing
-
-Send traces to multiple destinations simultaneously using either:
-
-- `ELASTIC_EVALS_TRACING_TARGETS` for a simple comma-separated list of targets.
-- `ELASTIC_EVALS_TRACING_EXPORTERS` for full JSON exporter configuration.
-
-### Using environment variables
-
-```bash
-# Option 1: Comma-separated targets (simple)
-export ELASTIC_EVALS_TRACING_TARGETS=otlp,console
-export ELASTIC_EVALS_TRACING_ENDPOINT=http://localhost:4318
-
-# Option 2: Full JSON configuration (flexible)
-export ELASTIC_EVALS_TRACING_EXPORTERS='[
-  {"type":"otlp","endpoint":"http://localhost:4318"},
-  {"type":"otlp","endpoint":"http://localhost:14318/v1/traces"}
-]'
-```
-
-### Using Python code
-
-```python
-from elastic_evals.tracing import TracingConfig, ExporterConfig, init_tracing
-
-config = TracingConfig(
-    exporters=[
-        ExporterConfig(type="otlp", endpoint="http://localhost:4318"),
-        ExporterConfig(type="console"),
-    ],
-    service_name="elastic-evals",
-)
-init_tracing(config)
-```
 
 ## Evaluators reference
 
@@ -181,22 +142,6 @@ init_tracing(config)
 - **Correctness analysis**: structured judgment of factuality, relevance, and sequence accuracy
 - **Groundedness analysis**: verifies claims against tool-call evidence
 - **Criteria evaluator**: custom PASS/FAIL/N/A criteria for arbitrary checks
-
-### CODE evaluators
-
-- **RAG metrics**: Precision@K, Recall@K, and F1@K for retrieval quality
-
-### Trace-based evaluators
-
-- **Input/Output/Cached tokens**
-- **Latency** (overall and span-level)
-- **Tool call counts**
-
-Trace-based evaluators require:
-
-1. An OpenTelemetry collector (e.g., [EDOT Collector](https://www.elastic.co/docs/reference/edot-collector)) running to receive traces
-2. Tracing enabled with `ELASTIC_EVALS_TRACING_ENDPOINT` pointing to the collector
-3. Elasticsearch with APM data accessible via `TRACE_ES_URL`
 
 ## Elasticsearch export
 
@@ -219,9 +164,6 @@ To export, build documents with `build_flattened_score_documents()` and send the
 elastic-evals run <script.py>        # Run evaluation script
 elastic-evals run --suite <suite>    # Run a registered suite plugin
 elastic-evals list                   # List suites and example scripts
-elastic-evals compare <id1> <id2>    # Compare runs with paired t-tests
-elastic-evals doctor                 # Check prerequisites
-elastic-evals env                    # Show supported env vars
 ```
 
 ### Suite discovery plugins
@@ -236,7 +178,7 @@ my-suite = "my_package.my_suite:get_suite"
 Entry points return an `EvaluationSuite` instance (sync or async):
 
 ```python
-from elastic_evals.suites import EvaluationSuite
+from elastic_evals.runner.suites import EvaluationSuite
 
 def get_suite() -> EvaluationSuite:
     return EvaluationSuite(

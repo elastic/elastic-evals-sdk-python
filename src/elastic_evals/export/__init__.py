@@ -1,11 +1,8 @@
 """Export utilities for elastic-evals."""
 
-from .documents import EvaluationScoreDocument
+from .documents import EvaluationScoreDocument, build_flattened_score_documents
 from .git_metadata import GitMetadata, get_git_metadata
-from .repository import (
-    EvaluationScoreRepository,
-    build_flattened_score_documents,
-)
+from .repository import EvaluationScoreRepository
 
 __all__ = [
     "EvaluationScoreDocument",

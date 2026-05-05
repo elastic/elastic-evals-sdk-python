@@ -9,7 +9,6 @@ from typing import Any
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential
 
 from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.evaluators.filter import parse_selected_evaluators
 from elastic_evals.evaluators.groundedness.prompt import PROMPT, tool_choice
 from elastic_evals.evaluators.groundedness.scoring import calculate_groundedness_score
 from elastic_evals.evaluators.groundedness.types import GroundednessAnalysis
@@ -18,16 +17,6 @@ from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
 
 QUALITATIVE_EVALUATOR_NAME = "Groundedness Analysis"
 QUANTITATIVE_EVALUATOR_NAME = "Groundedness"
-
-
-def _should_run_groundedness_analysis() -> bool:
-    selected = parse_selected_evaluators()
-    if not selected:
-        return True
-    return (
-        QUALITATIVE_EVALUATOR_NAME in selected
-        or QUANTITATIVE_EVALUATOR_NAME in selected
-    )
 
 
 def _parse_tool_arguments(tool_call: Any) -> dict[str, Any]:
@@ -63,9 +52,6 @@ def create_groundedness_analysis_evaluator(
     *, inference_client: KibanaInferenceClient, log: logging.Logger
 ) -> Evaluator:
     async def evaluate(params: EvaluatorParams) -> EvaluationResult:
-        if not _should_run_groundedness_analysis():
-            return EvaluationResult()
-
         async def run_analysis() -> GroundednessAnalysis:
             user_query = (params.input or {}).get("question")
             messages = (params.output or {}).get("messages") or []

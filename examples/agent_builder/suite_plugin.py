@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from elastic_evals.suites import EvaluationSuite
+from elastic_evals.runner.suites import EvaluationSuite
 
 
 def _require_env(name: str) -> None:

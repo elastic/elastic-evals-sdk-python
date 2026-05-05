@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from elastic_evals.cli.main import main
+from elastic_evals.runner.cli.main import main
 
 __all__ = ["main"]
