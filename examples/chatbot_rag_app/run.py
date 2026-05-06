@@ -5,8 +5,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from elasticsearch import AsyncElasticsearch
-
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.evaluators.criteria import (
@@ -14,11 +12,6 @@ from elastic_evals.evaluators.criteria import (
     create_criteria_evaluator,
 )
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.export import (
-    EvaluationScoreRepository,
-    build_flattened_score_documents,
-)
-from elastic_evals.export.documents import ModelInfo
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
 
@@ -29,15 +22,6 @@ from examples.chatbot_rag_app.evaluators.source_citation import (
     create_source_citation_evaluator,
 )
 from examples.chatbot_rag_app.tasks.chatbot_rag import chatbot_rag_task
-
-
-def _model_info_from_config(config: ElasticEvalsConfig) -> ModelInfo:
-    model = config.model or {}
-    return ModelInfo(
-        id=model.get("id"),
-        family=model.get("family", "unknown"),
-        provider=model.get("provider", "unknown"),
-    )
 
 
 def _read_criteria(metadata: dict[str, Any] | None) -> list[EvaluationCriterion]:
@@ -87,25 +71,11 @@ async def main() -> None:
     async def task(example):
         return await chatbot_rag_task(example, config)
 
-    result = await client.run_experiment(
+    await client.run_experiment(
         dataset=workplace_questions_dataset,
         task=task,
         evaluators=evaluators,
     )
-
-    es = AsyncElasticsearch(config.evaluations_es_url)
-    repository = EvaluationScoreRepository(es, log)
-    task_model = _model_info_from_config(config)
-    evaluator_model = _model_info_from_config(config)
-    documents = build_flattened_score_documents(
-        experiments=[result],
-        task_model=task_model,
-        evaluator_model=evaluator_model,
-        run_id=config.run_id,
-        total_repetitions=config.repetitions,
-    )
-    await repository.export_scores(documents)
-    await es.close()
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-Python SDK for running offline LLM evaluations with Kibana connectors, Elasticsearch exports,
+Python SDK for running offline LLM evaluations with Kibana connectors, Kibana evals API ingestion,
 and OpenTelemetry tracing. This mirrors the `kbn-evals` framework used in Kibana, adapted
 to a Python-first workflow.
 
@@ -11,7 +11,7 @@ to a Python-first workflow.
 
 - **Experiment runner** with configurable concurrency and repetitions
 - **Built-in evaluators** for correctness, groundedness, and criteria
-- **Elasticsearch export** to `.kibana-evaluations` datastreams
+- **Score ingestion** through Kibana evals plugin and its APIs
 - **OpenTelemetry tracing** with OTLP/HTTP endpoint configuration
 - **Optional CLI** (`elastic-evals[runner]`) for `run` and `list`
 - **Suite discovery plugins** via Python entry points in the runner package
@@ -95,7 +95,8 @@ asyncio.run(main())
 ### Dataset
 
 An `EvaluationDataset` is a collection of `Example` items with input, expected output,
-and optional metadata. Each dataset is hashed into a stable ID for exports.
+and optional metadata. Before each run, the dataset is upserted to Kibana and refreshed
+from Kibana's canonical dataset examples.
 
 ### Task
 
@@ -118,22 +119,22 @@ Results are stored in `RanExperiment`.
 
 ### Environment variables
 
-| Variable                                  | Description                                             | Required | Default                           |
-| ----------------------------------------- | ------------------------------------------------------- | -------- | --------------------------------- |
-| `KIBANA_URL`                              | Kibana base URL                                         | No       | `http://localhost:5601`           |
-| `CONNECTOR_ID`                            | Kibana connector ID for tasks                           | Yes      | -                                 |
-| `EVALUATION_CONNECTOR_ID`                 | Connector ID for evaluator LLMs                         | No       | -                                 |
-| `EVALUATIONS_ES_URL`                      | Elasticsearch URL for scores                            | Yes      | -                                 |
-| `TRACE_ES_URL`                            | Elasticsearch URL for traces                            | No       | -                                 |
-| `ELASTIC_EVALS_RUN_ID`                    | Override run ID                                         | No       | UUID                              |
-| `ELASTIC_EVALS_REPETITIONS`               | Number of repetitions                                   | No       | `1`                               |
-| `ELASTIC_EVALS_CONCURRENCY`               | Concurrency level                                       | No       | `5`                               |
-| `ELASTIC_EVALS_LOG_LEVEL`                 | Log level                                               | No       | `INFO`                            |
-| `ELASTIC_EVALS_MODEL`                     | JSON model metadata override                            | No       | -                                 |
-| `ELASTIC_EVALS_TRACING_ENABLED`           | Enable tracing (`true`/`false`)                         | No       | `true`                            |
-| `ELASTIC_EVALS_TRACING_EXPORTER`          | Tracing exporter (`otlp`, `console`, `none`)            | No       | `otlp`                            |
-| `ELASTIC_EVALS_TRACING_ENDPOINT`          | OTLP/HTTP endpoint                                      | No       | `http://localhost:4318/v1/traces` |
-| `ELASTIC_EVALS_TRACING_SERVICE_NAME`      | Tracing service name                                    | No       | `elastic-evals`                   |
+| Variable                             | Description                                              | Required | Default                           |
+| ------------------------------------ | -------------------------------------------------------- | -------- | --------------------------------- |
+| `KIBANA_URL`                         | Kibana base URL                                          | No       | `http://localhost:5601`           |
+| `KIBANA_API_KEY`                     | API key with `evals` plugin privilege for secured Kibana | No       | -                                 |
+| `CONNECTOR_ID`                       | Kibana connector ID for tasks                            | Yes      | -                                 |
+| `EVALUATION_CONNECTOR_ID`            | Connector ID for evaluator LLMs                          | No       | -                                 |
+| `TRACE_ES_URL`                       | Elasticsearch URL for traces                             | No       | -                                 |
+| `ELASTIC_EVALS_RUN_ID`               | Override run ID                                          | No       | UUID                              |
+| `ELASTIC_EVALS_REPETITIONS`          | Number of repetitions                                    | No       | `1`                               |
+| `ELASTIC_EVALS_CONCURRENCY`          | Concurrency level                                        | No       | `5`                               |
+| `ELASTIC_EVALS_LOG_LEVEL`            | Log level                                                | No       | `INFO`                            |
+| `ELASTIC_EVALS_MODEL`                | JSON model metadata override                             | No       | -                                 |
+| `ELASTIC_EVALS_TRACING_ENABLED`      | Enable tracing (`true`/`false`)                          | No       | `true`                            |
+| `ELASTIC_EVALS_TRACING_EXPORTER`     | Tracing exporter (`otlp`, `console`, `none`)             | No       | `otlp`                            |
+| `ELASTIC_EVALS_TRACING_ENDPOINT`     | OTLP/HTTP endpoint                                       | No       | `http://localhost:4318/v1/traces` |
+| `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name                                     | No       | `elastic-evals`                   |
 
 ## Evaluators reference
 
@@ -143,20 +144,19 @@ Results are stored in `RanExperiment`.
 - **Groundedness analysis**: verifies claims against tool-call evidence
 - **Criteria evaluator**: custom PASS/FAIL/N/A criteria for arbitrary checks
 
-## Elasticsearch export
+## Score ingestion
 
-Exports target the `.kibana-evaluations` data stream. The schema includes:
+`elastic-evals` posts scores to `POST /internal/evals/scores` once per evaluator result.
+The SDK no longer writes score documents directly to Elasticsearch.
 
-- `@timestamp`
-- `run_id`, `experiment_id`
-- `example` (id, index, input_hash, dataset)
-- `task` (trace_id, repetition_index, model)
-- `evaluator` (name, score, label, explanation, metadata, model)
-- `run_metadata` (git_branch, git_commit_sha, total_repetitions)
-- `environment` (hostname)
+## Datasets
 
-To export, build documents with `build_flattened_score_documents()` and send them via
-`EvaluationScoreRepository` (see `examples/agent_builder/run.py` for a reference).
+`run_experiment()` syncs datasets to Kibana before each run by calling
+`POST /internal/evals/datasets/_upsert`, then reads canonical examples from
+`GET /internal/evals/datasets/{dataset_id}`.
+
+**This sync is destructive**: examples missing from a later run's dataset payload are deleted
+from Kibana dataset storage.
 
 ## CLI
 
@@ -203,7 +203,6 @@ Run it with:
 elastic-evals run --suite agent-builder \
   --connector-id "<connector-id>" \
   --evaluation-connector-id "<evaluator-connector-id>" \
-  --evaluations-es-url "http://elastic:changeme@localhost:9220" \
   --kibana-url "http://elastic:changeme@localhost:5620" \
   --tracing-exporter "otlp" \
   --tracing-endpoint "http://localhost:4320"

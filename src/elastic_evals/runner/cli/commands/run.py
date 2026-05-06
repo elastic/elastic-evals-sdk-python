@@ -62,7 +62,6 @@ def _temporary_env(overrides: dict[str, str]) -> Iterator[None]:
 @click.option("--run-id", help="Override run ID used by elastic-evals.")
 @click.option("--repetitions", "-r", type=int, help="Number of repetitions.")
 @click.option("--concurrency", "-c", type=int, help="Concurrency level.")
-@click.option("--evaluations-es-url", help="Elasticsearch URL for evaluations.")
 @click.option("--trace-es-url", help="Elasticsearch URL for traces.")
 @click.option("--kibana-url", help="Kibana base URL.")
 @click.option("--connector-id", help="Kibana connector ID for tasks.")
@@ -85,7 +84,6 @@ def run_cmd(
     run_id: str | None,
     repetitions: int | None,
     concurrency: int | None,
-    evaluations_es_url: str | None,
     trace_es_url: str | None,
     kibana_url: str | None,
     connector_id: str | None,
@@ -108,8 +106,6 @@ def run_cmd(
         overrides["ELASTIC_EVALS_REPETITIONS"] = str(repetitions)
     if concurrency is not None:
         overrides["ELASTIC_EVALS_CONCURRENCY"] = str(concurrency)
-    if evaluations_es_url:
-        overrides["EVALUATIONS_ES_URL"] = evaluations_es_url
     if trace_es_url:
         overrides["TRACE_ES_URL"] = trace_es_url
     if kibana_url:

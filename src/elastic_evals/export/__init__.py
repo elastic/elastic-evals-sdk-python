@@ -1,13 +1,30 @@
 """Export utilities for elastic-evals."""
 
-from .documents import EvaluationScoreDocument, build_flattened_score_documents
+from elastic_evals.api import (
+    Ci,
+    Environment,
+    IngestEvaluator,
+    IngestExample,
+    IngestScoreItem,
+    IngestScoresRequest,
+    IngestTask,
+    Model,
+    RunMetadata,
+)
+from .documents import build_ingest_score_item
 from .git_metadata import GitMetadata, get_git_metadata
-from .repository import EvaluationScoreRepository
 
 __all__ = [
-    "EvaluationScoreDocument",
-    "EvaluationScoreRepository",
+    "Ci",
+    "Environment",
+    "IngestEvaluator",
+    "IngestExample",
+    "IngestScoreItem",
+    "IngestScoresRequest",
+    "IngestTask",
+    "Model",
+    "RunMetadata",
     "GitMetadata",
-    "build_flattened_score_documents",
+    "build_ingest_score_item",
     "get_git_metadata",
 ]

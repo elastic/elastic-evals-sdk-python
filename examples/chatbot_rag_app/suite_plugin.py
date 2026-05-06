@@ -18,7 +18,6 @@ def _require_env(name: str) -> None:
 
 def _run_chatbot_rag_example() -> None:
     _require_env("CONNECTOR_ID")
-    _require_env("EVALUATIONS_ES_URL")
 
     script_path = Path(__file__).resolve().parent / "run.py"
     if not script_path.is_file():

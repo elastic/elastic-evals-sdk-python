@@ -1,0 +1,94 @@
+"""DTOs for /internal/evals/scores ingest API."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel
+
+
+class Model(BaseModel):
+    id: str
+    family: str | None = None
+    provider: str | None = None
+
+
+class RunMetadata(BaseModel):
+    total_repetitions: int
+    git_branch: str | None = None
+    git_commit_sha: str | None = None
+
+
+class Environment(BaseModel):
+    hostname: str
+
+
+class BuildkiteMetadata(BaseModel):
+    build_id: str | None = None
+    job_id: str | None = None
+    build_url: str | None = None
+    pipeline_slug: str | None = None
+    pull_request: str | None = None
+    branch: str | None = None
+    commit: str | None = None
+
+
+class Ci(BaseModel):
+    buildkite: BuildkiteMetadata | None = None
+
+
+class Dataset(BaseModel):
+    id: str
+    name: str
+
+
+class IngestExample(BaseModel):
+    id: str
+    index: int
+    dataset: Dataset
+    input: dict[str, Any] | None = None
+
+
+class IngestTask(BaseModel):
+    repetition_index: int
+    trace_id: str | None = None
+    output: dict[str, Any] | None = None
+
+
+class IngestEvaluator(BaseModel):
+    name: str
+    score: float | None = None
+    label: str | None = None
+    explanation: str | None = None
+    metadata: dict[str, Any] | None = None
+    trace_id: str | None = None
+
+
+class IngestScoreItem(BaseModel):
+    example: IngestExample
+    task: IngestTask
+    evaluator: IngestEvaluator
+
+
+class IngestScoresRequest(BaseModel):
+    run_id: str
+    experiment_id: str
+    suite_id: str | None = None
+    task_model: Model
+    evaluator_model: Model
+    run_metadata: RunMetadata
+    environment: Environment
+    ci: Ci | None = None
+    scores: list[IngestScoreItem]
+
+
+class IngestScoresFailure(BaseModel):
+    index: int
+    status: int
+    reason: str
+
+
+class IngestScoresResponse(BaseModel):
+    ingested: int
+    conflicted: int
+    failed: list[IngestScoresFailure]

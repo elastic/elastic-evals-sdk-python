@@ -3,14 +3,25 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 import logging
+import socket
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from elastic_evals.api import (
+    Ci,
+    Environment,
+    KibanaDatasetsClient,
+    Model,
+    RunMetadata,
+    UpsertDatasetExamplePayload,
+    compute_dataset_id,
+)
+from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
+from elastic_evals.export.documents import build_ingest_score_item
+from elastic_evals.export.git_metadata import get_git_metadata
 from elastic_evals.inference import KibanaInferenceClient
 from elastic_evals.tracing import (
     get_current_trace_id,
@@ -23,6 +34,7 @@ from elastic_evals.types import (
     Evaluator,
     EvaluatorParams,
     Example,
+    ExampleWithId,
     RanExperiment,
     RunData,
     TaskOutput,
@@ -39,28 +51,6 @@ from elastic_evals.utils.logging import (
 ExperimentTask = Callable[[Example], Awaitable[TaskOutput]]
 
 
-def _is_empty(value: Any) -> bool:
-    if value is None:
-        return True
-    if value == "":
-        return True
-    if isinstance(value, (list, dict, tuple, set)) and len(value) == 0:
-        return True
-    return False
-
-
-def _normalize_example(example: Example) -> dict[str, Any]:
-    metadata = example.metadata or {}
-    normalized_metadata = {
-        key: val for key, val in metadata.items() if not _is_empty(val)
-    }
-    return {
-        "input": example.input,
-        "output": example.output,
-        "metadata": normalized_metadata,
-    }
-
-
 class ElasticEvalsClient:
     def __init__(
         self, config: ElasticEvalsConfig, logger: logging.Logger | None = None
@@ -69,6 +59,14 @@ class ElasticEvalsClient:
         self._logger = logger or config.logger
         self._experiments: list[RanExperiment] = []
         self._inference_client: KibanaInferenceClient | None = None
+        self._datasets_client = KibanaDatasetsClient(
+            kibana_url=self.config.kibana_url,
+            api_key=self.config.kibana_api_key,
+        )
+        self._scores_client = KibanaScoresClient(
+            kibana_url=self.config.kibana_url,
+            api_key=self.config.kibana_api_key,
+        )
 
     def get_inference_client(self) -> KibanaInferenceClient:
         if self._inference_client is None:
@@ -92,9 +90,37 @@ class ElasticEvalsClient:
     ) -> RanExperiment:
         run_concurrency = max(1, concurrency or self.config.concurrency)
         semaphore = asyncio.Semaphore(run_concurrency)
-        dataset_id = self._compute_dataset_id(dataset)
+        dataset_id = compute_dataset_id(dataset.name)
         experiment_id = str(uuid.uuid4())
         repetitions = self.config.repetitions
+        task_model = self._build_task_model()
+        evaluator_model = self._build_evaluator_model()
+        run_metadata = self._build_run_metadata()
+        environment = Environment(hostname=socket.gethostname())
+        ci: Ci | None = None
+
+        await self._datasets_client.upsert(
+            dataset.name,
+            dataset.description,
+            [
+                UpsertDatasetExamplePayload(
+                    input=self._dict_or_none(example.input),
+                    output=self._dict_or_none(example.output),
+                    metadata=self._dict_or_none(example.metadata),
+                )
+                for example in dataset.examples
+            ],
+        )
+        upstream_dataset = await self._datasets_client.get(dataset_id)
+        upstream_examples = [
+            ExampleWithId(
+                id=example.id,
+                input=example.input or {},
+                output=example.output,
+                metadata=example.metadata,
+            )
+            for example in upstream_dataset.examples
+        ]
 
         runs: dict[str, RunData] = {}
         evaluation_runs: list[EvaluationRun] = []
@@ -104,7 +130,7 @@ class ElasticEvalsClient:
         )
 
         async def run_example(
-            example: Example, example_index: int, repetition: int
+            example: ExampleWithId, example_index: int, repetition: int
         ) -> None:
             async with semaphore:
                 run_key = f"{example_index}-{repetition}-{uuid.uuid4()}"
@@ -152,13 +178,33 @@ class ElasticEvalsClient:
                             repetition_index=repetition,
                             experiment_run_id=run_key,
                             trace_id=eval_trace_id or get_current_trace_id(),
+                            example_id=example.id,
                         )
                     )
+                    task_run = runs[run_key]
+                    score_payload = build_ingest_score_item(
+                        run_id=self.config.run_id,
+                        experiment_id=experiment_id,
+                        suite_id=self.config.suite_id,
+                        task_model=task_model,
+                        evaluator_model=evaluator_model,
+                        run_metadata=run_metadata,
+                        environment=environment,
+                        ci=ci,
+                        dataset_id=dataset_id,
+                        dataset_name=dataset.name,
+                        example_id=example.id,
+                        example_index=example_index,
+                        example_input=self._dict_or_none(example.input),
+                        task_run=task_run,
+                        evaluation_run=evaluation_runs[-1],
+                    )
+                    await self._scores_client.ingest_scores(score_payload)
                     log_evaluator_complete(evaluator.name, example_index, repetition)
 
         jobs: list[Awaitable[None]] = []
         for rep in range(repetitions):
-            for example_index, example in enumerate(dataset.examples):
+            for example_index, example in enumerate(upstream_examples):
                 jobs.append(run_example(example, example_index, rep))
 
         await asyncio.gather(*jobs)
@@ -185,11 +231,30 @@ class ElasticEvalsClient:
     async def get_ran_experiments(self) -> list[RanExperiment]:
         return self._experiments
 
-    def _compute_dataset_id(self, dataset: EvaluationDataset) -> str:
-        payload = {
-            "name": dataset.name,
-            "description": dataset.description,
-            "examples": [_normalize_example(example) for example in dataset.examples],
-        }
-        normalized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    @staticmethod
+    def _dict_or_none(value: Any) -> dict[str, Any] | None:
+        if isinstance(value, dict):
+            return value
+        return None
+
+    def _build_task_model(self) -> Model:
+        configured_model = self.config.model or {}
+        model_id = configured_model.get("id")
+        model_family = configured_model.get("family")
+        model_provider = configured_model.get("provider")
+        return Model(
+            id=str(model_id) if model_id is not None else self.config.connector_id,
+            family=str(model_family) if model_family is not None else None,
+            provider=str(model_provider) if model_provider is not None else None,
+        )
+
+    def _build_evaluator_model(self) -> Model:
+        return Model(id=self.config.evaluator_connector_id or self.config.connector_id)
+
+    def _build_run_metadata(self) -> RunMetadata:
+        git_metadata = get_git_metadata()
+        return RunMetadata(
+            total_repetitions=self.config.repetitions,
+            git_branch=git_metadata.branch,
+            git_commit_sha=git_metadata.commit_sha,
+        )

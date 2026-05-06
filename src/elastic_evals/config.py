@@ -45,13 +45,15 @@ class ElasticEvalsConfig(BaseModel):
     concurrency: int = 5
 
     kibana_url: str = "http://localhost:5601"
+    kibana_api_key: str | None = None
     connector_id: str
     evaluator_connector_id: str | None = None
 
-    evaluations_es_url: str
     trace_es_url: str | None = None
 
     tracing: TracingConfig = Field(default_factory=TracingConfig)
+
+    suite_id: str | None = None
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     model: dict[str, Any] | None = None
@@ -70,9 +72,9 @@ class ElasticEvalsConfig(BaseModel):
             os.environ.get("ELASTIC_EVALS_CONCURRENCY", "5"), name="concurrency"
         )
         kibana_url = os.environ.get("KIBANA_URL", "http://localhost:5601")
+        kibana_api_key = os.environ.get("KIBANA_API_KEY")
         connector_id = _get_required_env("CONNECTOR_ID")
         evaluator_connector_id = os.environ.get("EVALUATION_CONNECTOR_ID")
-        evaluations_es_url = _get_required_env("EVALUATIONS_ES_URL")
         trace_es_url = os.environ.get("TRACE_ES_URL")
 
         log_level = os.environ.get("ELASTIC_EVALS_LOG_LEVEL", "INFO").upper()
@@ -80,6 +82,8 @@ class ElasticEvalsConfig(BaseModel):
             raise ValueError(
                 "ELASTIC_EVALS_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR"
             )
+
+        suite_id = os.environ.get("ELASTIC_EVALS_SUITE_ID")
 
         model_payload = os.environ.get("ELASTIC_EVALS_MODEL")
         model = None
@@ -110,10 +114,11 @@ class ElasticEvalsConfig(BaseModel):
             repetitions=repetitions,
             concurrency=concurrency,
             kibana_url=kibana_url,
+            kibana_api_key=kibana_api_key,
             connector_id=connector_id,
             evaluator_connector_id=evaluator_connector_id,
-            evaluations_es_url=evaluations_es_url,
             trace_es_url=trace_es_url,
+            suite_id=suite_id,
             tracing=tracing,
             log_level=cast(Literal["DEBUG", "INFO", "WARNING", "ERROR"], log_level),
             model=model,

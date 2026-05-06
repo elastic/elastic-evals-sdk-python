@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-from elasticsearch import AsyncElasticsearch
-
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.correctness import (
     create_correctness_analysis_evaluator,
@@ -16,25 +14,11 @@ from elastic_evals.evaluators.groundedness import (
     create_quantitative_groundedness_evaluator,
 )
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.export import (
-    EvaluationScoreRepository,
-    build_flattened_score_documents,
-)
-from elastic_evals.export.documents import ModelInfo
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluatorParams
 
 from examples.agent_builder.datasets.ambiguous_queries import ambiguous_queries_dataset
 from examples.agent_builder.tasks.agent_builder import agent_builder_task
-
-
-def _model_info_from_config(config: ElasticEvalsConfig) -> ModelInfo:
-    model = config.model or {}
-    return ModelInfo(
-        id=model.get("id"),
-        family=model.get("family", "unknown"),
-        provider=model.get("provider", "unknown"),
-    )
 
 
 async def main() -> None:
@@ -76,25 +60,11 @@ async def main() -> None:
         response["groundednessAnalysis"] = groundedness_result.metadata
         return response
 
-    result = await client.run_experiment(
+    await client.run_experiment(
         dataset=ambiguous_queries_dataset,
         task=task,
         evaluators=quantitative_evaluators,
     )
-
-    es = AsyncElasticsearch(config.evaluations_es_url)
-    repository = EvaluationScoreRepository(es, log)
-    task_model = _model_info_from_config(config)
-    evaluator_model = _model_info_from_config(config)
-    documents = build_flattened_score_documents(
-        experiments=[result],
-        task_model=task_model,
-        evaluator_model=evaluator_model,
-        run_id=config.run_id,
-        total_repetitions=config.repetitions,
-    )
-    await repository.export_scores(documents)
-    await es.close()
 
 
 if __name__ == "__main__":

@@ -66,7 +66,6 @@ async def test_chatbot_rag_task_parses_sse(monkeypatch: pytest.MonkeyPatch) -> N
         Example(input={"question": "What is our working from home policy?"}),
         ElasticEvalsConfig(
             connector_id="connector-id",
-            evaluations_es_url="http://localhost:9200",
         ),
     )
 

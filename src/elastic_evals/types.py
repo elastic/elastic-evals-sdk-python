@@ -29,6 +29,13 @@ class ExampleWithId(
 
 
 class EvaluationDataset(BaseModel, Generic[TExample]):
+    """User-provided dataset definition used by the runner.
+
+    During `run_experiment`, examples are upserted and re-fetched from Kibana, then the
+    task callable receives those upstream JSON-shaped examples (including server ids)
+    rather than the original in-memory Pydantic instances.
+    """
+
     name: str
     description: str
     examples: list[TExample]
