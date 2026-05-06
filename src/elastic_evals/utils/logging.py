@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlparse, urlunparse
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -84,6 +85,21 @@ def log_evaluator_complete(
 
 def log_experiment_complete(experiment_id: str) -> None:
     log.info("✅ Experiment %s completed", experiment_id)
+
+
+def _strip_auth_from_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.username or parsed.password:
+        host = parsed.hostname or ""
+        netloc = f"{host}:{parsed.port}" if parsed.port else host
+        return urlunparse(parsed._replace(netloc=netloc))
+    return url
+
+
+def log_results_url(kibana_url: str, run_id: str) -> None:
+    base = _strip_auth_from_url(kibana_url.rstrip("/"))
+    results_url = f"{base}/app/management/ai/evals/runs/{run_id}"
+    log.info("📊 View results: %s", results_url)
 
 
 def log_export_header() -> None:

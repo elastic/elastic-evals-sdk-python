@@ -45,6 +45,7 @@ from elastic_evals.utils.logging import (
     log_evaluator_start,
     log_experiment_complete,
     log_experiment_start,
+    log_results_url,
     log_task_execution,
 )
 
@@ -209,6 +210,7 @@ class ElasticEvalsClient:
 
         await asyncio.gather(*jobs)
         log_experiment_complete(experiment_id)
+        log_results_url(self.config.kibana_url, self.config.run_id)
 
         experiment_metadata: dict[str, Any] = {"run_id": self.config.run_id}
         if metadata:
