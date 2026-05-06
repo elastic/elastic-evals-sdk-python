@@ -10,6 +10,8 @@ import httpx
 from pydantic import BaseModel, ConfigDict
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from elastic_evals.tracing import propagated_headers
+
 
 class ChatMessage(BaseModel):
     role: str
@@ -164,6 +166,7 @@ class KibanaInferenceClient:
             "kbn-xsrf": "true",
             "Content-Type": "application/json",
             "x-elastic-internal-origin": "true",
+            **propagated_headers(),
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -226,6 +229,7 @@ class KibanaInferenceClient:
             "kbn-xsrf": "true",
             "Content-Type": "application/json",
             "x-elastic-internal-origin": "true",
+            **propagated_headers(),
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:

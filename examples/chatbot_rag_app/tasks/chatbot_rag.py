@@ -10,6 +10,7 @@ from uuid import uuid4
 import httpx
 
 from elastic_evals.config import ElasticEvalsConfig
+from elastic_evals.tracing import propagated_headers
 from elastic_evals.types import Example
 
 CHATBOT_APP_URL = os.environ.get("CHATBOT_APP_URL", "http://localhost:4000")
@@ -31,6 +32,7 @@ async def chatbot_rag_task(
             "POST",
             f"{CHATBOT_APP_URL}/api/chat?session_id={request_session_id}",
             json={"question": example.input.get("question")},
+            headers=propagated_headers(),
         ) as response:
             response.raise_for_status()
 

@@ -50,9 +50,14 @@ async def test_chatbot_rag_task_parses_sse(monkeypatch: pytest.MonkeyPatch) -> N
     ]
 
     def fake_stream(
-        self: httpx.AsyncClient, method: str, url: str, *, json: dict[str, Any]
+        self: httpx.AsyncClient,
+        method: str,
+        url: str,
+        *,
+        json: dict[str, Any],
+        headers: dict[str, str] | None = None,
     ) -> _FakeStreamResponse:
-        del self
+        del self, headers
         assert method == "POST"
         assert url.startswith(
             f"{chatbot_rag_module.CHATBOT_APP_URL}/api/chat?session_id="
