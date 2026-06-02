@@ -13,6 +13,7 @@ class Model(BaseModel):
     provider: str | None = None
 
 
+# Kept for use in executor/client.py and documents.py — not sent directly to the API.
 class RunMetadata(BaseModel):
     total_repetitions: int
     git_branch: str | None = None
@@ -35,6 +36,22 @@ class BuildkiteMetadata(BaseModel):
 
 class Ci(BaseModel):
     buildkite: BuildkiteMetadata | None = None
+
+
+class IngestGit(BaseModel):
+    branch: str | None = None
+    commit_sha: str | None = None
+
+
+class IngestMetadata(BaseModel):
+    """Maps to the `metadata` object in the Kibana /internal/evals/scores request body."""
+
+    total_repetitions: int
+    hostname: str
+    execution_id: str | None = None
+    suite_id: str | None = None
+    git: IngestGit | None = None
+    ci: BuildkiteMetadata | None = None
 
 
 class Dataset(BaseModel):
@@ -71,14 +88,11 @@ class IngestScoreItem(BaseModel):
 
 
 class IngestScoresRequest(BaseModel):
-    run_id: str
     experiment_id: str
-    suite_id: str | None = None
+    experiment_name: str | None = None
     task_model: Model
     evaluator_model: Model
-    run_metadata: RunMetadata
-    environment: Environment
-    ci: Ci | None = None
+    metadata: IngestMetadata
     scores: list[IngestScoreItem]
 
 
