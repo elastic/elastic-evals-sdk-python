@@ -144,6 +144,11 @@ class ElasticEvalsClient:
                     "task", {}, task_runner
                 )
 
+                if isinstance(task_output, dict):
+                    task_trace_id = task_output.pop(
+                        "_interaction_trace_id", task_trace_id
+                    )
+
                 runs[run_key] = RunData(
                     example_index=example_index,
                     repetition=repetition,

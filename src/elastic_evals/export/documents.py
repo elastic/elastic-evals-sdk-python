@@ -10,6 +10,8 @@ from elastic_evals.api import (
     Environment,
     IngestEvaluator,
     IngestExample,
+    IngestGit,
+    IngestMetadata,
     IngestScoreItem,
     IngestScoresRequest,
     IngestTask,
@@ -38,15 +40,28 @@ def build_ingest_score_item(
     evaluation_run: EvaluationRun,
 ) -> IngestScoresRequest:
     evaluator_result = evaluation_run.result
-    return IngestScoresRequest(
-        run_id=run_id,
-        experiment_id=experiment_id,
+
+    git: IngestGit | None = None
+    if run_metadata.git_branch or run_metadata.git_commit_sha:
+        git = IngestGit(
+            branch=run_metadata.git_branch,
+            commit_sha=run_metadata.git_commit_sha,
+        )
+
+    metadata = IngestMetadata(
+        execution_id=run_id,
         suite_id=suite_id,
+        total_repetitions=run_metadata.total_repetitions,
+        hostname=environment.hostname,
+        git=git,
+        ci=ci.buildkite if ci else None,
+    )
+
+    return IngestScoresRequest(
+        experiment_id=experiment_id,
         task_model=task_model,
         evaluator_model=evaluator_model,
-        run_metadata=run_metadata,
-        environment=environment,
-        ci=ci,
+        metadata=metadata,
         scores=[
             IngestScoreItem(
                 example=IngestExample(
