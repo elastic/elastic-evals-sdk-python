@@ -49,7 +49,8 @@ class ElasticEvalsConfig(BaseModel):
     connector_id: str
     evaluator_connector_id: str | None = None
 
-    trace_es_url: str | None = None
+    elasticsearch_url: str | None = None
+    elasticsearch_api_key: str | None = None
 
     tracing: TracingConfig = Field(default_factory=TracingConfig)
 
@@ -75,7 +76,8 @@ class ElasticEvalsConfig(BaseModel):
         kibana_api_key = os.environ.get("KIBANA_API_KEY")
         connector_id = _get_required_env("CONNECTOR_ID")
         evaluator_connector_id = os.environ.get("EVALUATION_CONNECTOR_ID")
-        trace_es_url = os.environ.get("TRACE_ES_URL")
+        elasticsearch_url = os.environ.get("ELASTICSEARCH_URL")
+        elasticsearch_api_key = os.environ.get("ELASTICSEARCH_API_KEY")
 
         log_level = os.environ.get("ELASTIC_EVALS_LOG_LEVEL", "INFO").upper()
         if log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
@@ -100,9 +102,8 @@ class ElasticEvalsConfig(BaseModel):
         )
         tracing = TracingConfig(
             enabled=tracing_enabled,
-            endpoint=os.environ.get(
-                "ELASTIC_EVALS_TRACING_ENDPOINT", "http://localhost:4318/v1/traces"
-            ),
+            endpoint=os.environ.get("ELASTIC_OTLP_ENDPOINT", "http://localhost:4318"),
+            api_key=os.environ.get("ELASTIC_OTLP_API_KEY"),
             service_name=os.environ.get(
                 "ELASTIC_EVALS_TRACING_SERVICE_NAME", "elastic-evals"
             ),
@@ -117,7 +118,8 @@ class ElasticEvalsConfig(BaseModel):
             kibana_api_key=kibana_api_key,
             connector_id=connector_id,
             evaluator_connector_id=evaluator_connector_id,
-            trace_es_url=trace_es_url,
+            elasticsearch_url=elasticsearch_url,
+            elasticsearch_api_key=elasticsearch_api_key,
             suite_id=suite_id,
             tracing=tracing,
             log_level=cast(Literal["DEBUG", "INFO", "WARNING", "ERROR"], log_level),

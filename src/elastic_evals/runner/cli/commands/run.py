@@ -62,7 +62,7 @@ def _temporary_env(overrides: dict[str, str]) -> Iterator[None]:
 @click.option("--run-id", help="Override run ID used by elastic-evals.")
 @click.option("--repetitions", "-r", type=int, help="Number of repetitions.")
 @click.option("--concurrency", "-c", type=int, help="Concurrency level.")
-@click.option("--trace-es-url", help="Elasticsearch URL for traces.")
+@click.option("--elasticsearch-url", help="Elasticsearch URL for trace lookup.")
 @click.option("--kibana-url", help="Kibana base URL.")
 @click.option("--connector-id", help="Kibana connector ID for tasks.")
 @click.option("--evaluation-connector-id", help="Connector ID for evaluator LLMs.")
@@ -84,7 +84,7 @@ def run_cmd(
     run_id: str | None,
     repetitions: int | None,
     concurrency: int | None,
-    trace_es_url: str | None,
+    elasticsearch_url: str | None,
     kibana_url: str | None,
     connector_id: str | None,
     evaluation_connector_id: str | None,
@@ -106,8 +106,8 @@ def run_cmd(
         overrides["ELASTIC_EVALS_REPETITIONS"] = str(repetitions)
     if concurrency is not None:
         overrides["ELASTIC_EVALS_CONCURRENCY"] = str(concurrency)
-    if trace_es_url:
-        overrides["TRACE_ES_URL"] = trace_es_url
+    if elasticsearch_url:
+        overrides["ELASTICSEARCH_URL"] = elasticsearch_url
     if kibana_url:
         overrides["KIBANA_URL"] = kibana_url
     if connector_id:
@@ -119,7 +119,7 @@ def run_cmd(
     if tracing_exporter:
         overrides["ELASTIC_EVALS_TRACING_EXPORTER"] = tracing_exporter
     if tracing_endpoint:
-        overrides["ELASTIC_EVALS_TRACING_ENDPOINT"] = tracing_endpoint
+        overrides["ELASTIC_OTLP_ENDPOINT"] = tracing_endpoint
 
     prefix = _format_env_prefix(overrides)
     if suite:

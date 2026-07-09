@@ -77,6 +77,7 @@ class ElasticEvalsClient:
             self._inference_client = KibanaInferenceClient(
                 kibana_url=self.config.kibana_url,
                 connector_id=connector_id,
+                api_key=self.config.kibana_api_key,
             )
         return self._inference_client
 

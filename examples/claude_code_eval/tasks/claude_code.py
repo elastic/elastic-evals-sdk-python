@@ -22,6 +22,7 @@ async def _fetch_interaction_trace_id(
     run_id: str,
     example_id: str,
     *,
+    api_key: str | None = None,
     max_attempts: int = 15,
     poll_interval_s: float = 2.0,
 ) -> str | None:
@@ -47,6 +48,9 @@ async def _fetch_interaction_trace_id(
         },
         "_source": ["trace_id"],
     }
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["Authorization"] = f"ApiKey {api_key}"
     async with httpx.AsyncClient() as client:
         for _ in range(max_attempts):
             await asyncio.sleep(poll_interval_s)
@@ -54,6 +58,7 @@ async def _fetch_interaction_trace_id(
                 resp = await client.post(
                     f"{es_url}/.ds-traces-generic.otel-default-*/_search",
                     json=query,
+                    headers=headers,
                     timeout=10.0,
                 )
                 hits = resp.json().get("hits", {}).get("hits", [])
@@ -80,7 +85,7 @@ async def claude_code_task(
       children in APM if its Node.js OTel SDK reads this env var (requires the env propagator
       to be wired up in Claude Code — see README for details)
 
-    After the subprocess exits, if TRACE_ES_URL is configured this function polls Elasticsearch
+    After the subprocess exits, if ELASTICSEARCH_URL is configured this function polls Elasticsearch
     for the claude_code.interaction span and returns its trace_id as "_interaction_trace_id" so
     the executor can substitute it for the eval harness trace_id, linking the UI to the actual
     LLM interaction trace.
@@ -205,9 +210,12 @@ async def claude_code_task(
     if is_error or proc.returncode != 0:
         result["error"] = stderr_text or response_text
 
-    if config.trace_es_url and example_id:
+    if config.elasticsearch_url and example_id:
         interaction_trace_id = await _fetch_interaction_trace_id(
-            config.trace_es_url, config.run_id, example_id
+            config.elasticsearch_url,
+            config.run_id,
+            example_id,
+            api_key=config.elasticsearch_api_key,
         )
         if interaction_trace_id:
             result["_interaction_trace_id"] = interaction_trace_id

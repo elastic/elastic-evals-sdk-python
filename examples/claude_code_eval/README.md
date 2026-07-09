@@ -32,8 +32,8 @@ Or run directly:
   CONNECTOR_ID="azure-gpt4_1" \
   KIBANA_URL="http://elastic:changeme@host.docker.internal:5601/dev" \
   EDOT_ENDPOINT="http://kibana-edot-collector:4318" \
-  ELASTIC_EVALS_TRACING_ENDPOINT="http://kibana-edot-collector:4318/v1/traces" \
-  TRACE_ES_URL="http://elastic:changeme@host.docker.internal:9200" \
+  ELASTIC_OTLP_ENDPOINT="http://kibana-edot-collector:4318" \
+  ELASTICSEARCH_URL="http://elastic:changeme@host.docker.internal:9200" \
   uv run elastic-evals run --suite claude-code-eval
 ```
 

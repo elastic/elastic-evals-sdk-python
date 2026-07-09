@@ -19,7 +19,8 @@ class TracingConfig(BaseModel):
     """Configuration for tracing with a single OTLP exporter."""
 
     enabled: bool = True
-    endpoint: str = "http://localhost:4318/v1/traces"
+    endpoint: str = "http://localhost:4318"
+    api_key: str | None = None
     service_name: str = "elastic-evals"
     run_id: str | None = None
 
@@ -42,7 +43,11 @@ def init_tracing(config: TracingConfig) -> None:
 
     resource = Resource.create({"service.name": config.service_name})
     provider = TracerProvider(resource=resource)
-    exporter = OTLPSpanExporter(endpoint=_normalize_otlp_http_endpoint(config.endpoint))
+    headers = {"Authorization": f"ApiKey {config.api_key}"} if config.api_key else {}
+    exporter = OTLPSpanExporter(
+        endpoint=_normalize_otlp_http_endpoint(config.endpoint),
+        headers=headers,
+    )
     provider.add_span_processor(BatchSpanProcessor(exporter))
 
     trace.set_tracer_provider(provider)
