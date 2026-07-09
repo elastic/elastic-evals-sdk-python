@@ -7,32 +7,31 @@ import httpx
 import pytest
 
 from elastic_evals.api import (
-    Ci,
     Dataset,
-    Environment,
     IngestEvaluator,
     IngestExample,
+    IngestMetadata,
     IngestScoreItem,
     IngestScoresError,
     IngestScoresRequest,
     IngestScoresResponse,
     IngestTask,
     Model,
-    RunMetadata,
 )
 from elastic_evals.api.scores_client import KibanaScoresClient
 
 
 def _build_payload() -> IngestScoresRequest:
     return IngestScoresRequest(
-        run_id="run-1",
         experiment_id="exp-1",
-        suite_id="suite-1",
         task_model=Model(id="gpt-4o"),
         evaluator_model=Model(id="judge-1"),
-        run_metadata=RunMetadata(total_repetitions=1),
-        environment=Environment(hostname="localhost"),
-        ci=Ci(),
+        metadata=IngestMetadata(
+            execution_id="run-1",
+            suite_id="suite-1",
+            total_repetitions=1,
+            hostname="localhost",
+        ),
         scores=[
             IngestScoreItem(
                 example=IngestExample(

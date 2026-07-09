@@ -46,18 +46,16 @@ def test_build_ingest_score_item_matches_scores_contract() -> None:
     )
 
     assert payload.model_dump(exclude_none=True) == {
-        "run_id": "run-1",
         "experiment_id": "exp-1",
-        "suite_id": "suite-1",
         "task_model": {"id": "task-model", "family": "gpt", "provider": "openai"},
         "evaluator_model": {"id": "eval-model", "family": "gpt", "provider": "openai"},
-        "run_metadata": {
+        "metadata": {
+            "execution_id": "run-1",
+            "suite_id": "suite-1",
             "total_repetitions": 3,
-            "git_branch": "main",
-            "git_commit_sha": "abc123",
+            "hostname": "worker-1",
+            "git": {"branch": "main", "commit_sha": "abc123"},
         },
-        "environment": {"hostname": "worker-1"},
-        "ci": {},
         "scores": [
             {
                 "example": {

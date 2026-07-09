@@ -200,7 +200,7 @@ async def test_runner_end_to_end(
     first_score = fake_kibana["scores"][0]["body"]
     second_score = fake_kibana["scores"][1]["body"]
 
-    assert first_score["run_id"] == "run-123"
+    assert first_score["metadata"]["execution_id"] == "run-123"
     assert first_score["scores"][0]["example"]["dataset"]["id"] == compute_dataset_id(
         "tiny"
     )
