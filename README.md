@@ -125,7 +125,8 @@ Results are stored in `RanExperiment`.
 | `KIBANA_API_KEY`                     | API key with `evals` plugin privilege for secured Kibana | No       | -                                 |
 | `CONNECTOR_ID`                       | Kibana connector ID for tasks                            | Yes      | -                                 |
 | `EVALUATION_CONNECTOR_ID`            | Connector ID for evaluator LLMs                          | No       | -                                 |
-| `TRACE_ES_URL`                       | Elasticsearch URL for traces                             | No       | -                                 |
+| `ELASTICSEARCH_URL`                  | Elasticsearch URL for trace lookup                       | No       | -                                 |
+| `ELASTICSEARCH_API_KEY`              | API key for Elasticsearch trace lookup                   | No       | -                                 |
 | `ELASTIC_EVALS_RUN_ID`               | Override run ID                                          | No       | UUID                              |
 | `ELASTIC_EVALS_REPETITIONS`          | Number of repetitions                                    | No       | `1`                               |
 | `ELASTIC_EVALS_CONCURRENCY`          | Concurrency level                                        | No       | `5`                               |
@@ -133,7 +134,8 @@ Results are stored in `RanExperiment`.
 | `ELASTIC_EVALS_MODEL`                | JSON model metadata override                             | No       | -                                 |
 | `ELASTIC_EVALS_TRACING_ENABLED`      | Enable tracing (`true`/`false`)                          | No       | `true`                            |
 | `ELASTIC_EVALS_TRACING_EXPORTER`     | Tracing exporter (`otlp`, `console`, `none`)             | No       | `otlp`                            |
-| `ELASTIC_EVALS_TRACING_ENDPOINT`     | OTLP/HTTP endpoint                                       | No       | `http://localhost:4318/v1/traces` |
+| `ELASTIC_OTLP_ENDPOINT`              | OTLP/HTTP base endpoint                                  | No       | `http://localhost:4318`           |
+| `ELASTIC_OTLP_API_KEY`              | API key used for OTLP Authorization header               | No       | -                                 |
 | `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name                                     | No       | `elastic-evals`                   |
 
 ## Evaluators reference
