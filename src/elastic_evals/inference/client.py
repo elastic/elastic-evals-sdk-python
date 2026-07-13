@@ -16,6 +16,8 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 
 from elastic_evals.tracing import propagated_headers
 
+# TODO: Temporary place (authorization part needs to be refactored)
+from elastic_evals.agent_builder.headers import build_agent_builder_headers
 
 class ChatMessage(BaseModel):
     role: str
@@ -121,11 +123,12 @@ class KibanaInferenceClient:
         kibana_url: str,
         connector_id: str,
         timeout: float = 120.0,
-        api_key: str | None = None,
+        api_key: str | None = None
     ) -> None:
         self.kibana_url = kibana_url.rstrip("/")
         self.connector_id = connector_id
         self.timeout = timeout
+        self.api_key = api_key
         self.api_key = api_key
 
     @retry(
@@ -163,14 +166,14 @@ class KibanaInferenceClient:
             }
         }
 
-        headers = {
-            "kbn-xsrf": "true",
-            "Content-Type": "application/json",
-            "x-elastic-internal-origin": "true",
-            **propagated_headers(),
-        }
-        if self.api_key:
-            headers["Authorization"] = f"ApiKey {self.api_key}"
+        headers = build_agent_builder_headers(self.api_key)
+
+        #headers = {
+        #    "kbn-xsrf": "true",
+        #    "Content-Type": "application/json",
+        #    "x-elastic-internal-origin": "true",
+        #    **propagated_headers(),
+        #}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=payload, headers=headers)
@@ -224,14 +227,14 @@ class KibanaInferenceClient:
         if model_name is not None:
             payload["modelName"] = model_name
 
-        headers = {
-            "kbn-xsrf": "true",
-            "Content-Type": "application/json",
-            "x-elastic-internal-origin": "true",
-            **propagated_headers(),
-        }
-        if self.api_key:
-            headers["Authorization"] = f"ApiKey {self.api_key}"
+        #headers = {
+        #    "kbn-xsrf": "true",
+        #    "Content-Type": "application/json",
+        #    "x-elastic-internal-origin": "true",
+        #    **propagated_headers(),
+        #}
+
+        headers = build_agent_builder_headers(self.api_key)
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=payload, headers=headers)
