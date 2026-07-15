@@ -28,8 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-      - run: uv pip install --system .
-      - run: uv pip install --system ".[runner]"
+      - run: uv venv
+      - run: uv pip install .
+      - run: uv pip install ".[runner]"
   
   test:
     runs-on: ubuntu-latest
