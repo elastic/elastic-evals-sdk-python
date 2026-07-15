@@ -45,3 +45,29 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/elastic_evals", "examples"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+  "I",   # isort
+  "F",   # pyflakes
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "PLC", # pylint convention
+  "PLE", # pylint error
+  "Q",   # flake8-quotes
+  "A",   # flake8-builtins
+]
+ignore = [
+  "E501", # line-too-long (enforced by formatter instead)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/evaluators/**/prompt.py" = ["W291", "W293"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["elastic_evals"]
