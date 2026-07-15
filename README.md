@@ -220,7 +220,7 @@ elastic-evals run --suite agent-builder \
 Install dev dependencies and set up pre-commit hooks for automatic linting and formatting:
 
 ```bash
-uv sync --extra dev
+uv sync
 uv run pre-commit install
 ```
 
