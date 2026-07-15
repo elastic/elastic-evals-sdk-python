@@ -67,9 +67,7 @@ def fake_kibana(
         url = str(request.url)
         headers = dict(request.headers)
 
-        if request.method == "POST" and url.endswith(
-            "/internal/evals/datasets/_upsert"
-        ):
+        if request.method == "POST" and url.endswith("/internal/evals/datasets/_upsert"):
             body = json.loads(request.content.decode("utf-8"))
             requests["upsert"].append({"url": url, "headers": headers, "body": body})
             return httpx.Response(
@@ -82,9 +80,7 @@ def fake_kibana(
                 },
             )
 
-        if request.method == "GET" and url.endswith(
-            f"/internal/evals/datasets/{dataset_id}"
-        ):
+        if request.method == "GET" and url.endswith(f"/internal/evals/datasets/{dataset_id}"):
             requests["get"].append({"url": url, "headers": headers})
             return httpx.Response(
                 status_code=200,
@@ -118,9 +114,7 @@ def fake_kibana(
         if request.method == "POST" and url.endswith("/internal/evals/scores"):
             body = json.loads(request.content.decode("utf-8"))
             requests["scores"].append({"url": url, "headers": headers, "body": body})
-            return httpx.Response(
-                status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []}
-            )
+            return httpx.Response(status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []})
 
         return httpx.Response(status_code=404, json={"message": "unexpected request"})
 
@@ -172,9 +166,7 @@ async def test_runner_end_to_end(
         return EvaluationResult(score=1.0)
 
     evaluator = SimpleEvaluator(name="echo", kind="CODE", evaluate=evaluate)
-    result = await client.run_experiment(
-        dataset=dataset, task=task, evaluators=[evaluator]
-    )
+    result = await client.run_experiment(dataset=dataset, task=task, evaluators=[evaluator])
 
     assert len(result.evaluation_runs) == 2
     assert all(run.result is not None for run in result.evaluation_runs)
@@ -196,18 +188,14 @@ async def test_runner_end_to_end(
     assert fake_kibana["upsert"][0]["headers"]["authorization"] == "ApiKey secret-key"
 
     assert len(fake_kibana["get"]) == 1
-    assert fake_kibana["get"][0]["url"].endswith(
-        f"/internal/evals/datasets/{compute_dataset_id('tiny')}"
-    )
+    assert fake_kibana["get"][0]["url"].endswith(f"/internal/evals/datasets/{compute_dataset_id('tiny')}")
 
     assert len(fake_kibana["scores"]) == 2
     first_score = fake_kibana["scores"][0]["body"]
     second_score = fake_kibana["scores"][1]["body"]
 
     assert first_score["metadata"]["execution_id"] == "run-123"
-    assert first_score["scores"][0]["example"]["dataset"]["id"] == compute_dataset_id(
-        "tiny"
-    )
+    assert first_score["scores"][0]["example"]["dataset"]["id"] == compute_dataset_id("tiny")
     assert first_score["scores"][0]["example"]["id"] == "upstream-example-1"
     assert first_score["scores"][0]["example"]["index"] == 0
     assert first_score["scores"][0]["task"]["repetition_index"] == 0
@@ -215,9 +203,7 @@ async def test_runner_end_to_end(
     assert first_score["scores"][0]["evaluator"]["name"] == "echo"
     assert first_score["scores"][0]["evaluator"]["score"] == 1.0
 
-    assert second_score["scores"][0]["example"]["dataset"]["id"] == compute_dataset_id(
-        "tiny"
-    )
+    assert second_score["scores"][0]["example"]["dataset"]["id"] == compute_dataset_id("tiny")
     assert second_score["scores"][0]["example"]["id"] == "upstream-example-2"
     assert second_score["scores"][0]["example"]["index"] == 1
     assert second_score["scores"][0]["task"]["output"] == {"answer": "TWO-UPSTREAM"}

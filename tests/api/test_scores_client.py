@@ -89,37 +89,20 @@ async def test_ingest_scores_200_returns_parsed_response(
 ) -> None:
     payload = _build_payload()
     _RecordingAsyncClient.configure(
-        [
-            httpx.Response(
-                status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []}
-            )
-        ]
+        [httpx.Response(status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []})]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaScoresClient("http://kibana:5601", api_key="key-123")
     result = await client.ingest_scores(payload)
 
     assert result == IngestScoresResponse(ingested=1, conflicted=0, failed=[])
-    assert (
-        _RecordingAsyncClient.requests[0]["url"]
-        == "http://kibana:5601/internal/evals/scores"
-    )
-    assert _RecordingAsyncClient.requests[0]["json"] == payload.model_dump(
-        exclude_none=True
-    )
+    assert _RecordingAsyncClient.requests[0]["url"] == "http://kibana:5601/internal/evals/scores"
+    assert _RecordingAsyncClient.requests[0]["json"] == payload.model_dump(exclude_none=True)
     assert _RecordingAsyncClient.requests[0]["headers"]["kbn-xsrf"] == "true"
-    assert (
-        _RecordingAsyncClient.requests[0]["headers"]["x-elastic-internal-origin"]
-        == "true"
-    )
+    assert _RecordingAsyncClient.requests[0]["headers"]["x-elastic-internal-origin"] == "true"
     assert _RecordingAsyncClient.requests[0]["headers"]["Elastic-Api-Version"] == "1"
-    assert (
-        _RecordingAsyncClient.requests[0]["headers"]["Authorization"]
-        == "ApiKey key-123"
-    )
+    assert _RecordingAsyncClient.requests[0]["headers"]["Authorization"] == "ApiKey key-123"
 
 
 @pytest.mark.asyncio
@@ -142,9 +125,7 @@ async def test_ingest_scores_207_logs_failures_and_returns_response(
             )
         ]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaScoresClient("http://kibana:5601")
     result = await client.ingest_scores(payload)
@@ -159,12 +140,8 @@ async def test_ingest_scores_400_raises_non_retryable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = _build_payload()
-    _RecordingAsyncClient.configure(
-        [httpx.Response(status_code=400, json={"message": "invalid payload"})]
-    )
-    monkeypatch.setattr(
-        "elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    _RecordingAsyncClient.configure([httpx.Response(status_code=400, json={"message": "invalid payload"})])
+    monkeypatch.setattr("elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaScoresClient("http://kibana:5601")
 
@@ -188,9 +165,7 @@ async def test_ingest_scores_429_retries_three_times_then_raises(
             httpx.Response(status_code=429, json={"message": "rate limited"}),
         ]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaScoresClient("http://kibana:5601")
 
@@ -209,17 +184,11 @@ async def test_ingest_scores_503_retries_then_succeeds(
     payload = _build_payload()
     _RecordingAsyncClient.configure(
         [
-            httpx.Response(
-                status_code=503, json={"message": "temporarily unavailable"}
-            ),
-            httpx.Response(
-                status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []}
-            ),
+            httpx.Response(status_code=503, json={"message": "temporarily unavailable"}),
+            httpx.Response(status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []}),
         ]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaScoresClient("http://kibana:5601")
     result = await client.ingest_scores(payload)
@@ -234,15 +203,9 @@ async def test_ingest_scores_without_api_key_omits_authorization_header(
 ) -> None:
     payload = _build_payload()
     _RecordingAsyncClient.configure(
-        [
-            httpx.Response(
-                status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []}
-            )
-        ]
+        [httpx.Response(status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []})]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.scores_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaScoresClient("http://kibana:5601", api_key=None)
     await client.ingest_scores(payload)

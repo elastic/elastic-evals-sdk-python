@@ -20,9 +20,7 @@ from elastic_evals.types import Example
 CHATBOT_APP_URL = os.environ.get("CHATBOT_APP_URL", "http://localhost:4000")
 
 
-async def chatbot_rag_task(
-    example: Example, config: ElasticEvalsConfig
-) -> dict[str, Any]:
+async def chatbot_rag_task(example: Example, config: ElasticEvalsConfig) -> dict[str, Any]:
     """Call the chatbot RAG app chat endpoint and parse SSE response."""
     del config
 

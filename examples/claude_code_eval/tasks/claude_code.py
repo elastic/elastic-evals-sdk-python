@@ -42,11 +42,7 @@ async def _fetch_interaction_trace_id(
                 "must": [
                     {"term": {"name": "claude_code.interaction"}},
                     {"term": {"resource.attributes.elastic.evals.run_id": run_id}},
-                    {
-                        "term": {
-                            "resource.attributes.elastic.evals.example_id": example_id
-                        }
-                    },
+                    {"term": {"resource.attributes.elastic.evals.example_id": example_id}},
                 ]
             }
         },
@@ -77,9 +73,7 @@ async def _fetch_interaction_trace_id(
 _SUBPROCESS_TIMEOUT_S = 120
 
 
-async def claude_code_task(
-    example: Example, config: ElasticEvalsConfig
-) -> dict[str, Any]:
+async def claude_code_task(example: Example, config: ElasticEvalsConfig) -> dict[str, Any]:
     """Run a prompt through the Claude Code CLI and return output with telemetry metadata.
 
     Environment variables injected into the subprocess:
@@ -151,9 +145,7 @@ async def claude_code_task(
     )
 
     try:
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            proc.communicate(), timeout=_SUBPROCESS_TIMEOUT_S
-        )
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=_SUBPROCESS_TIMEOUT_S)
     except asyncio.TimeoutError:
         proc.kill()
         await proc.communicate()

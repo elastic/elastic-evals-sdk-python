@@ -33,9 +33,7 @@ def setup_logging(level: str = "INFO") -> logging.Logger:
 log = setup_logging()
 
 
-def log_experiment_start(
-    run_id: str, dataset_name: str, evaluator_count: int, concurrency: int
-) -> None:
+def log_experiment_start(run_id: str, dataset_name: str, evaluator_count: int, concurrency: int) -> None:
     log.info(
         '🧪 Starting experiment "Run ID: %s - Dataset: %s" with %s evaluators and %s concurrent runs',
         run_id,
@@ -54,9 +52,7 @@ def log_task_execution(dataset_id: str, example_index: int, repetition: int) -> 
     )
 
 
-def log_evaluation_start(
-    example_index: int, repetition: int, evaluator_count: int
-) -> None:
+def log_evaluation_start(example_index: int, repetition: int, evaluator_count: int) -> None:
     log.info(
         "🧠 Evaluating run (exampleIndex=%s, repetition=%s) with %s evaluators",
         example_index,
@@ -65,9 +61,7 @@ def log_evaluation_start(
     )
 
 
-def log_evaluator_start(
-    evaluator_name: str, example_index: int, repetition: int
-) -> None:
+def log_evaluator_start(evaluator_name: str, example_index: int, repetition: int) -> None:
     log.info(
         '🧠 Evaluating run (exampleIndex=%s, repetition=%s) with evaluator "%s"',
         example_index,
@@ -76,9 +70,7 @@ def log_evaluator_start(
     )
 
 
-def log_evaluator_complete(
-    evaluator_name: str, example_index: int, repetition: int
-) -> None:
+def log_evaluator_complete(evaluator_name: str, example_index: int, repetition: int) -> None:
     log.info(
         '✅ Evaluator "%s" on run (exampleIndex=%s, repetition=%s) completed',
         evaluator_name,

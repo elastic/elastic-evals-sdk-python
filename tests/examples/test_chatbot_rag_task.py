@@ -63,9 +63,7 @@ async def test_chatbot_rag_task_parses_sse(monkeypatch: pytest.MonkeyPatch) -> N
     ) -> _FakeStreamResponse:
         del self, headers
         assert method == "POST"
-        assert url.startswith(
-            f"{chatbot_rag_module.CHATBOT_APP_URL}/api/chat?session_id="
-        )
+        assert url.startswith(f"{chatbot_rag_module.CHATBOT_APP_URL}/api/chat?session_id=")
         assert json == {"question": "What is our working from home policy?"}
         return _FakeStreamResponse(lines)
 

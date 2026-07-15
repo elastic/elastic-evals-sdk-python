@@ -334,9 +334,7 @@ PROMPT = {
 }
 
 
-def render_user_prompt(
-    user_query: str, agent_response: str, tool_call_history: str
-) -> str:
+def render_user_prompt(user_query: str, agent_response: str, tool_call_history: str) -> str:
     return (
         USER_PROMPT.replace("{{{user_query}}}", user_query)
         .replace("{{{agent_response}}}", agent_response)

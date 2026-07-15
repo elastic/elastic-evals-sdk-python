@@ -14,9 +14,7 @@ from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.types import Example
 
 
-async def agent_builder_task(
-    example: Example, config: ElasticEvalsConfig
-) -> dict[str, Any]:
+async def agent_builder_task(example: Example, config: ElasticEvalsConfig) -> dict[str, Any]:
     """Call Agent Builder API and return response."""
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(

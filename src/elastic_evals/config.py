@@ -70,12 +70,8 @@ class ElasticEvalsConfig(BaseModel):
     @classmethod
     def from_env(cls) -> "ElasticEvalsConfig":
         run_id = os.environ.get("ELASTIC_EVALS_RUN_ID") or str(uuid.uuid4())
-        repetitions = _parse_int(
-            os.environ.get("ELASTIC_EVALS_REPETITIONS", "1"), name="repetitions"
-        )
-        concurrency = _parse_int(
-            os.environ.get("ELASTIC_EVALS_CONCURRENCY", "5"), name="concurrency"
-        )
+        repetitions = _parse_int(os.environ.get("ELASTIC_EVALS_REPETITIONS", "1"), name="repetitions")
+        concurrency = _parse_int(os.environ.get("ELASTIC_EVALS_CONCURRENCY", "5"), name="concurrency")
         kibana_url = os.environ.get("KIBANA_URL", "http://localhost:5601")
         kibana_api_key = os.environ.get("KIBANA_API_KEY")
         connector_id = _get_required_env("CONNECTOR_ID")
@@ -85,9 +81,7 @@ class ElasticEvalsConfig(BaseModel):
 
         log_level = os.environ.get("ELASTIC_EVALS_LOG_LEVEL", "INFO").upper()
         if log_level not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
-            raise ValueError(
-                "ELASTIC_EVALS_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR"
-            )
+            raise ValueError("ELASTIC_EVALS_LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR")
 
         suite_id = os.environ.get("ELASTIC_EVALS_SUITE_ID")
 
@@ -108,9 +102,7 @@ class ElasticEvalsConfig(BaseModel):
             enabled=tracing_enabled,
             endpoint=os.environ.get("ELASTIC_OTLP_ENDPOINT", "http://localhost:4318"),
             api_key=os.environ.get("ELASTIC_OTLP_API_KEY"),
-            service_name=os.environ.get(
-                "ELASTIC_EVALS_TRACING_SERVICE_NAME", "elastic-evals"
-            ),
+            service_name=os.environ.get("ELASTIC_EVALS_TRACING_SERVICE_NAME", "elastic-evals"),
             run_id=run_id,
         )
 
