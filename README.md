@@ -18,27 +18,33 @@ to a Python-first workflow.
 
 ## Installation
 
-### Using pip
-
-```bash
-# Core SDK
-pip install elastic-evals
-
-# SDK + CLI runner
-pip install "elastic-evals[runner]"
-```
+This package is not yet published to PyPI. Install directly from GitHub:
 
 ### Using uv (recommended)
 
 ```bash
-uv add elastic-evals
+# Core SDK
+uv add "git+https://github.com/elastic/elastic-evals-sdk-python.git"
+
+# SDK + CLI runner
+uv add "elastic-evals[runner] @ git+https://github.com/elastic/elastic-evals-sdk-python.git"
+```
+
+### Using pip
+
+```bash
+# Core SDK
+pip install "git+https://github.com/elastic/elastic-evals-sdk-python.git"
+
+# SDK + CLI runner
+pip install "elastic-evals[runner] @ git+https://github.com/elastic/elastic-evals-sdk-python.git"
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/elastic/elastic-evals.git
-cd elastic-evals
+git clone https://github.com/elastic/elastic-evals-sdk-python.git
+cd elastic-evals-sdk-python
 uv sync
 ```
 
