@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from elastic_evals.types import Example, EvaluationDataset
+from elastic_evals.types import EvaluationDataset, Example
 
 ambiguous_queries_dataset = EvaluationDataset(
     name="agent builder: default-agent-ambiguous-queries",
@@ -14,15 +14,11 @@ ambiguous_queries_dataset = EvaluationDataset(
     examples=[
         Example(
             input={"question": "List projects which are unhealthy?"},
-            output={
-                "expected": "Can you clarify how to determine if a project is unhealthy"
-            },
+            output={"expected": "Can you clarify how to determine if a project is unhealthy"},
             metadata={"query_intent": "Factual"},
         ),
         Example(
-            input={
-                "question": "Can I get a list of our most active users from last week?"
-            },
+            input={"question": "Can I get a list of our most active users from last week?"},
             output={"expected": "What is the definition of an active user?"},
             metadata={"query_intent": "Investigative"},
         ),
@@ -33,9 +29,7 @@ ambiguous_queries_dataset = EvaluationDataset(
         ),
         Example(
             input={"question": "I would like to view my invoices."},
-            output={
-                "expected": "Can you clarify which invoices would you like to see?"
-            },
+            output={"expected": "Can you clarify which invoices would you like to see?"},
             metadata={"query_intent": "Procedural"},
         ),
     ],

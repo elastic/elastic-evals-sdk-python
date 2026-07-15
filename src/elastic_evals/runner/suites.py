@@ -6,11 +6,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import inspect
+from dataclasses import dataclass
 from importlib import metadata
 from typing import Awaitable, Callable, Iterable
-
 
 SuiteRunner = Callable[[], Awaitable[None] | None]
 

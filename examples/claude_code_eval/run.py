@@ -19,7 +19,6 @@ from elastic_evals.evaluators.criteria import (
 from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
-
 from examples.claude_code_eval.datasets.coding_tasks import coding_tasks_dataset
 from examples.claude_code_eval.evaluators.latency import create_latency_evaluator
 from examples.claude_code_eval.evaluators.tool_use import create_tool_use_evaluator
@@ -35,9 +34,7 @@ def _read_criteria(metadata: dict[str, Any] | None) -> list[EvaluationCriterion]
     return [c for c in raw if isinstance(c, str)]
 
 
-def create_criteria_evaluator_from_metadata(
-    *, inference_client: Any, log: Any
-) -> Evaluator:
+def create_criteria_evaluator_from_metadata(*, inference_client: Any, log: Any) -> Evaluator:
     async def evaluate(params: EvaluatorParams) -> EvaluationResult:
         criteria = _read_criteria(params.metadata)
         evaluator = create_criteria_evaluator(

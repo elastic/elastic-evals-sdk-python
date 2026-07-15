@@ -18,7 +18,6 @@ from elastic_evals.evaluators.criteria import (
 from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
-
 from examples.chatbot_rag_app.datasets.workplace_questions import (
     workplace_questions_dataset,
 )
