@@ -52,6 +52,7 @@ line-length = 120
 extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
+preview = true
 select = [
   "I",   # isort
   "F",   # pyflakes
@@ -61,10 +62,16 @@ select = [
   "PLE", # pylint error
   "Q",   # flake8-quotes
   "A",   # flake8-builtins
+  "CPY", # flake8-copyright
 ]
 ignore = [
-  "E501", # line-too-long (enforced by formatter instead)
+  "E501",    # line-too-long (enforced by formatter instead)
+  "PLC1901", # compare-to-empty-string; activated by preview mode, not worth enforcing
 ]
+
+[tool.ruff.lint.flake8-copyright]
+notice-rgx = "# Copyright Elasticsearch B\\.V\\."
+min-file-size = 2
 
 [tool.ruff.lint.per-file-ignores]
 "**/evaluators/**/prompt.py" = ["W291", "W293"]
