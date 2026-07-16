@@ -13,6 +13,12 @@ import pytest
 
 from elastic_evals.api import compute_dataset_id
 from elastic_evals.config import ElasticEvalsConfig
+from elastic_evals.evaluators import (
+    create_input_tokens_evaluator,
+    create_latency_evaluator,
+    create_output_tokens_evaluator,
+    create_tool_calls_evaluator,
+)
 from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.tracing import TracingConfig
@@ -60,7 +66,12 @@ class _TransportBackedAsyncClient:
 def fake_kibana(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncIterator[dict[str, list[dict[str, Any]]]]:
-    requests: dict[str, list[dict[str, Any]]] = {"upsert": [], "get": [], "scores": []}
+    requests: dict[str, list[dict[str, Any]]] = {
+        "upsert": [],
+        "get": [],
+        "scores": [],
+        "trace_queries": [],
+    }
     dataset_id = compute_dataset_id("tiny")
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -116,6 +127,23 @@ def fake_kibana(
             requests["scores"].append({"url": url, "headers": headers, "body": body})
             return httpx.Response(status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []})
 
+        if request.method == "POST" and url.endswith("/_query?format=json"):
+            body = json.loads(request.content.decode("utf-8"))
+            requests["trace_queries"].append({"url": url, "headers": headers, "body": body})
+            query = body["query"]
+            if "latency_seconds" in query:
+                column, value = "latency_seconds", 2.5
+            elif "input_tokens" in query:
+                column, value = "input_tokens", 123
+            elif "output_tokens" in query:
+                column, value = "output_tokens", 45
+            else:
+                column, value = "tool_calls", 3
+            return httpx.Response(
+                status_code=200,
+                json={"columns": [{"name": column, "type": "double"}], "values": [[value]]},
+            )
+
         return httpx.Response(status_code=404, json={"message": "unexpected request"})
 
     _TransportBackedAsyncClient.transport = httpx.MockTransport(handler)
@@ -125,6 +153,10 @@ def fake_kibana(
     )
     monkeypatch.setattr(
         "elastic_evals.api.scores_client.httpx.AsyncClient",
+        _TransportBackedAsyncClient,
+    )
+    monkeypatch.setattr(
+        "elastic_evals.tracing.client.httpx.AsyncClient",
         _TransportBackedAsyncClient,
     )
 
@@ -156,13 +188,16 @@ async def test_runner_end_to_end(
     client = ElasticEvalsClient(config=config)
     seen_task_inputs: list[dict[str, Any]] = []
     seen_eval_inputs: list[dict[str, Any]] = []
+    seen_eval_trace_ids: list[str | None] = []
 
     async def task(example: Example) -> dict[str, str]:
         seen_task_inputs.append(example.input)
-        return {"answer": example.input["q"]}
+        trace_id = "1" * 32 if example.input["q"].startswith("ONE") else "2" * 32
+        return {"answer": example.input["q"], "_interaction_trace_id": trace_id}
 
     async def evaluate(params: EvaluatorParams) -> EvaluationResult:
         seen_eval_inputs.append(params.input)
+        seen_eval_trace_ids.append(params.trace_id)
         return EvaluationResult(score=1.0)
 
     evaluator = SimpleEvaluator(name="echo", kind="CODE", evaluate=evaluate)
@@ -175,6 +210,7 @@ async def test_runner_end_to_end(
     assert result.dataset_id == compute_dataset_id("tiny")
     assert seen_task_inputs == [{"q": "ONE-UPSTREAM"}, {"q": "TWO-UPSTREAM"}]
     assert seen_eval_inputs == [{"q": "ONE-UPSTREAM"}, {"q": "TWO-UPSTREAM"}]
+    assert seen_eval_trace_ids == ["1" * 32, "2" * 32]
 
     assert len(fake_kibana["upsert"]) == 1
     assert fake_kibana["upsert"][0]["body"] == {
@@ -207,3 +243,50 @@ async def test_runner_end_to_end(
     assert second_score["scores"][0]["example"]["id"] == "upstream-example-2"
     assert second_score["scores"][0]["example"]["index"] == 1
     assert second_score["scores"][0]["task"]["output"] == {"answer": "TWO-UPSTREAM"}
+
+
+@pytest.mark.asyncio
+async def test_runner_executes_registered_trace_metrics_from_elasticsearch(
+    fake_kibana: dict[str, list[dict[str, Any]]],
+) -> None:
+    dataset = EvaluationDataset(
+        name="tiny",
+        description="tiny dataset",
+        examples=[Example(input={"q": "one"}), Example(input={"q": "two"})],
+    )
+    config = ElasticEvalsConfig(
+        run_id="trace-metrics-run",
+        connector_id="test-connector",
+        kibana_url="http://kibana:5601",
+        elasticsearch_url="http://elasticsearch:9200",
+        elasticsearch_api_key="trace-key",
+        repetitions=1,
+        concurrency=1,
+        tracing=TracingConfig(enabled=False),
+    )
+    client = ElasticEvalsClient(config=config)
+    trace_client = client.get_trace_client()
+    evaluators = [
+        create_latency_evaluator(trace_client=trace_client, log=config.logger),
+        create_input_tokens_evaluator(trace_client=trace_client, log=config.logger),
+        create_output_tokens_evaluator(trace_client=trace_client, log=config.logger),
+        create_tool_calls_evaluator(trace_client=trace_client, log=config.logger),
+    ]
+
+    async def task(example: Example) -> dict[str, str]:
+        trace_id = "1" * 32 if example.input["q"].startswith("ONE") else "2" * 32
+        return {"answer": example.input["q"], "_interaction_trace_id": trace_id}
+
+    result = await client.run_experiment(dataset=dataset, task=task, evaluators=evaluators)
+
+    assert len(result.evaluation_runs) == 8
+    assert len(fake_kibana["trace_queries"]) == 8
+    assert len(fake_kibana["scores"]) == 8
+    assert all(query["url"] == "http://elasticsearch:9200/_query?format=json" for query in fake_kibana["trace_queries"])
+    assert all(query["headers"]["authorization"] == "ApiKey trace-key" for query in fake_kibana["trace_queries"])
+    assert {run.name for run in result.evaluation_runs} == {
+        "latency",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls",
+    }
