@@ -4,15 +4,18 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "sunday"
-      time: "22:00"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "sunday"
-      time: "22:00"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+      
     groups:
       github-actions:
         patterns:

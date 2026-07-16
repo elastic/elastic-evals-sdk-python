@@ -23,7 +23,7 @@ What you expected to happen.
 - OS:
 - Python version:
 - `elastic-evals` version:
-- Kibana version:
+- Elastic Stack version:
 
 **Additional context**
 
