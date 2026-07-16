@@ -1,7 +1,7 @@
 # Orca dataset config for the Wix knowledge base corpus.
-# Copied verbatim from orca's configs/etl/datasets/customer_support.yml (scoped to
-# the single `wix_knowledge_base` corpus) so Arm A runs orca's real pipeline.
-# GCS path resolved by orca: <gcs_root>/customer_support/wix_knowledge_base/wix_knowledge_base.csv
+# Copied verbatim from orca_helpers's configs/etl/datasets/customer_support.yml (scoped to
+# the single `wix_knowledge_base` corpus) so Arm A runs orca_helpers's real pipeline.
+# GCS path resolved by orca_helpers: <gcs_root>/customer_support/wix_knowledge_base/wix_knowledge_base.csv
 dataset: 'customer_support'
 corpus:
   - name: 'wix_knowledge_base'

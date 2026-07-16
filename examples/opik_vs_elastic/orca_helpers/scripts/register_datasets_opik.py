@@ -1,7 +1,7 @@
 """Register the full Wix QA golden dataset into Opik.
 
-Mirrors orca's dataset-registration pattern (see
-orca-framework/orca/src/orca/evaluation/datasets/registration.py and
+Mirrors orca_helpers's dataset-registration pattern (see
+orca_helpers-framework/orca_helpers/src/orca_helpers/evaluation/datasets/registration.py and
 transformers.py): read the golden CSV from GCS, derive ``relevant_doc_ids``
 from the ground-truth column, then create/insert into an Opik dataset.
 
@@ -16,11 +16,11 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
-# examples/opik_vs_elastic/orca/ holds opik_client.py; add it to sys.path and
-# import it by bare module name rather than as `orca.opik_client` — `orca` is
-# also the name of the real orca package, and importing `orca.<anything>` here
+# examples/opik_vs_elastic/orca_helpers/ holds opik_client.py; add it to sys.path and
+# import it by bare module name rather than as `orca_helpers.opik_client` — `orca_helpers` is
+# also the name of the real orca_helpers package, and importing `orca_helpers.<anything>` here
 # would risk resolving to this local example folder instead of the installed
-# orca package (or vice versa).
+# orca_helpers package (or vice versa).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from opik_client import extract_relevant_doc_ids, get_opik_datasets_client  # noqa: E402
 

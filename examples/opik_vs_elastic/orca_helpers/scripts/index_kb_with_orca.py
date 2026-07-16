@@ -1,21 +1,21 @@
-"""Index the Wix knowledge base into Elasticsearch using orca's real pipeline.
+"""Index the Wix knowledge base into Elasticsearch using orca_helpers's real pipeline.
 
-This mirrors orca's own ``orca.etl.indexing.cli`` so it runs the exact code the
-orca team uses: ``load_dataset_config`` -> ``get_elasticsearch_client`` ->
+This mirrors orca_helpers's own ``orca_helpers.etl.indexing.cli`` so it runs the exact code the
+orca_helpers team uses: ``load_dataset_config`` -> ``get_elasticsearch_client`` ->
 ``index_dataset``, reading the cleaned corpus from GCS. Compare against
 ``run.py``'s step 2, which indexes the same corpus with the SDK-native
-Elasticsearch client instead of orca's pipeline.
+Elasticsearch client instead of orca_helpers's pipeline.
 
 Prerequisites:
-- Install orca into this environment, e.g.:
-    uv pip install -e ../../../../orca-framework/orca
+- Install orca_helpers into this environment, e.g.:
+    uv pip install -e ../../../../orca_helpers-framework/orca_helpers
 - Elasticsearch auth: set CLOUD_ID + ELASTICSEARCH_API_KEY (or ES_HOST).
 - GCS auth for gcsfs (application default credentials).
 - The semantic_text mappings require the referenced inference endpoints
   (ELSER and ``.jina-embeddings-v3``) to exist in the cluster.
 
 Run:
-    python examples/opik_vs_elastic/orca/scripts/index_kb_with_orca.py
+    python examples/opik_vs_elastic/orca_helpers/scripts/index_kb_with_orca.py
 """
 
 from __future__ import annotations

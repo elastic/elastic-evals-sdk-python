@@ -1,9 +1,9 @@
-"""Opik dataset client, mirroring and extending orca's opik_client.py.
+"""Opik dataset client, mirroring and extending orca_helpers's opik_client.py.
 
-orca's ``clients/opik_client.py`` only wraps ``get_dataset`` and
+orca_helpers's ``clients/opik_client.py`` only wraps ``get_dataset`` and
 ``get_or_create_dataset``. This module adds the remaining dataset operations
 that the Opik SDK already supports (list, add rows, retrieve rows, URLs) but
-that orca's wrapper does not expose.
+that orca_helpers's wrapper does not expose.
 """
 
 from __future__ import annotations
@@ -118,7 +118,7 @@ def get_opik_datasets_client(project_name: str | None = None) -> OpikDatasetsCli
 def extract_relevant_doc_ids(df: pd.DataFrame, source: str) -> pd.DataFrame:
     """Split a stringified ``{doc_id: 0|1}`` column into relevant/non-relevant IDs.
 
-    Mirrors orca's ``transformers._extract_dict_keys``: parses ``source`` with
+    Mirrors orca_helpers's ``transformers._extract_dict_keys``: parses ``source`` with
     :func:`ast.literal_eval` and splits its keys into ``relevant_doc_ids``
     (truthy values) and ``NOT_relevant_doc_ids`` (falsy values).
 

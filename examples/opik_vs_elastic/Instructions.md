@@ -19,10 +19,17 @@ uv add --optional poc datasets pandas python-dotenv ipykernel elasticsearch opik
 uv sync --extra poc
 ```
 
-Orca must be importable. Clone the `orca` repo as a sibling of `elastic-evals-sdk-python/` (adjust the path below if you put it elsewhere), then install it editable:
+Orca must be importable. Clone the `orca` repo as a sibling of `elastic-evals-sdk-python/` so the layout is:
+
+```
+── elastic-evals-sdk-python/
+── orca/
+```
+
+Then install it editable and register it under the `poc` extra:
 
 ```bash
-uv pip install -e ../orca
+uv add --optional poc --editable ../orca
 ```
 
 Register the venv as a Jupyter kernel. Only needed if your notebook/IDE doesn't pick up `.venv` automatically:
