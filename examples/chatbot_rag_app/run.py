@@ -1,3 +1,7 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 """Run chatbot RAG app evaluation example."""
 
 from __future__ import annotations
@@ -14,7 +18,6 @@ from elastic_evals.evaluators.criteria import (
 from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
-
 from examples.chatbot_rag_app.datasets.workplace_questions import (
     workplace_questions_dataset,
 )

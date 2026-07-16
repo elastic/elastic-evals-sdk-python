@@ -1,3 +1,7 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 """Run Agent Builder evaluation example."""
 
 from __future__ import annotations
@@ -16,7 +20,6 @@ from elastic_evals.evaluators.groundedness import (
 from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluatorParams
-
 from examples.agent_builder.datasets.ambiguous_queries import ambiguous_queries_dataset
 from examples.agent_builder.tasks.agent_builder import agent_builder_task
 
@@ -35,12 +38,8 @@ async def main() -> None:
 
     inference_client = client.get_inference_client()
     log = config.logger
-    correctness_analysis = create_correctness_analysis_evaluator(
-        inference_client=inference_client, log=log
-    )
-    groundedness_analysis = create_groundedness_analysis_evaluator(
-        inference_client=inference_client, log=log
-    )
+    correctness_analysis = create_correctness_analysis_evaluator(inference_client=inference_client, log=log)
+    groundedness_analysis = create_groundedness_analysis_evaluator(inference_client=inference_client, log=log)
     quantitative_evaluators = [
         *create_quantitative_correctness_evaluators(),
         create_quantitative_groundedness_evaluator(),

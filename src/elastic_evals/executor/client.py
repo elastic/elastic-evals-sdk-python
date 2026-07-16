@@ -57,9 +57,7 @@ ExperimentTask = Callable[[Example], Awaitable[TaskOutput]]
 
 
 class ElasticEvalsClient:
-    def __init__(
-        self, config: ElasticEvalsConfig, logger: logging.Logger | None = None
-    ) -> None:
+    def __init__(self, config: ElasticEvalsConfig, logger: logging.Logger | None = None) -> None:
         self.config = config
         self._logger = logger or config.logger
         self._experiments: list[RanExperiment] = []
@@ -75,9 +73,7 @@ class ElasticEvalsClient:
 
     def get_inference_client(self) -> KibanaInferenceClient:
         if self._inference_client is None:
-            connector_id = (
-                self.config.evaluator_connector_id or self.config.connector_id
-            )
+            connector_id = self.config.evaluator_connector_id or self.config.connector_id
             self._inference_client = KibanaInferenceClient(
                 kibana_url=self.config.kibana_url,
                 connector_id=connector_id,
@@ -131,13 +127,9 @@ class ElasticEvalsClient:
         runs: dict[str, RunData] = {}
         evaluation_runs: list[EvaluationRun] = []
 
-        log_experiment_start(
-            self.config.run_id, dataset.name, len(evaluators), run_concurrency
-        )
+        log_experiment_start(self.config.run_id, dataset.name, len(evaluators), run_concurrency)
 
-        async def run_example(
-            example: ExampleWithId, example_index: int, repetition: int
-        ) -> None:
+        async def run_example(example: ExampleWithId, example_index: int, repetition: int) -> None:
             async with semaphore:
                 run_key = f"{example_index}-{repetition}-{uuid.uuid4()}"
                 log_task_execution(dataset_id, example_index, repetition)
@@ -145,14 +137,10 @@ class ElasticEvalsClient:
                 async def task_runner() -> TaskOutput:
                     return await task(example)
 
-                task_output, task_trace_id = await with_task_span(
-                    "task", {}, task_runner
-                )
+                task_output, task_trace_id = await with_task_span("task", {}, task_runner)
 
                 if isinstance(task_output, dict):
-                    task_trace_id = task_output.pop(
-                        "_interaction_trace_id", task_trace_id
-                    )
+                    task_trace_id = task_output.pop("_interaction_trace_id", task_trace_id)
 
                 runs[run_key] = RunData(
                     example_index=example_index,
@@ -178,9 +166,7 @@ class ElasticEvalsClient:
                     async def evaluator_runner() -> Any:
                         return await evaluator.evaluate(params)
 
-                    result, eval_trace_id = await with_evaluator_span(
-                        evaluator.name, {}, evaluator_runner
-                    )
+                    result, eval_trace_id = await with_evaluator_span(evaluator.name, {}, evaluator_runner)
                     evaluation_runs.append(
                         EvaluationRun(
                             name=evaluator.name,

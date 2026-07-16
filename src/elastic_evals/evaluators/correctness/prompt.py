@@ -48,7 +48,7 @@ Follow these steps rigorously:
             * Minor Embellishment: The core action/fact is correct, but an adjective/detail is an unverified addition (e.g., ground truth says "click the 'Reset' button", agent says "click the large 'Reset' button").
         * `CONTRADICTED`: The claim is explicitly contradicted by the ground truth.
         * `NOT_IN_GROUND_TRUTH`: The claim's core fact is not verifiable in the ground truth. This applies to claims that are entirely or largely unverifiable against the provided text, distinguishing them from claims that are just embellished or can be inferred (`PARTIALLY_SUPPORTED`).
-      
+
       B. Sequence Verdict: Assign one of the following based on order:
         *  MATCH: The claim appears in the correct sequence relative to other claims, as determined from the ground truth.
         *  MISMATCH: The claim is correct but appears in the wrong order (e.g., Step 3 is presented before Step 2).
@@ -401,9 +401,7 @@ PROMPT = {
 }
 
 
-def render_user_prompt(
-    user_query: str, agent_response: str, ground_truth_response: str
-) -> str:
+def render_user_prompt(user_query: str, agent_response: str, ground_truth_response: str) -> str:
     return (
         USER_PROMPT.replace("{{{user_query}}}", user_query)
         .replace("{{{agent_response}}}", agent_response)

@@ -1,3 +1,7 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 from __future__ import annotations
 
 import uuid
@@ -37,9 +41,7 @@ class _RecordingAsyncClient:
         json: dict[str, Any],
         headers: dict[str, str],
     ) -> httpx.Response:
-        self.requests.append(
-            {"method": "POST", "url": url, "json": json, "headers": headers}
-        )
+        self.requests.append({"method": "POST", "url": url, "json": json, "headers": headers})
         outcome = self.responses.pop(0)
         if isinstance(outcome, BaseException):
             raise outcome
@@ -79,21 +81,14 @@ async def test_upsert_posts_expected_body_and_returns_response(
             )
         ]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaDatasetsClient("http://kibana:5601", api_key="key-123")
     response = await client.upsert("demo", "desc", examples)
 
-    assert response == UpsertDatasetResponse(
-        dataset_id="dataset-1", added=2, removed=1, unchanged=0
-    )
+    assert response == UpsertDatasetResponse(dataset_id="dataset-1", added=2, removed=1, unchanged=0)
     assert _RecordingAsyncClient.requests[0]["method"] == "POST"
-    assert (
-        _RecordingAsyncClient.requests[0]["url"]
-        == "http://kibana:5601/internal/evals/datasets/_upsert"
-    )
+    assert _RecordingAsyncClient.requests[0]["url"] == "http://kibana:5601/internal/evals/datasets/_upsert"
     assert _RecordingAsyncClient.requests[0]["json"] == {
         "name": "demo",
         "description": "desc",
@@ -103,15 +98,9 @@ async def test_upsert_posts_expected_body_and_returns_response(
         ],
     }
     assert _RecordingAsyncClient.requests[0]["headers"]["kbn-xsrf"] == "true"
-    assert (
-        _RecordingAsyncClient.requests[0]["headers"]["x-elastic-internal-origin"]
-        == "true"
-    )
+    assert _RecordingAsyncClient.requests[0]["headers"]["x-elastic-internal-origin"] == "true"
     assert _RecordingAsyncClient.requests[0]["headers"]["Elastic-Api-Version"] == "1"
-    assert (
-        _RecordingAsyncClient.requests[0]["headers"]["Authorization"]
-        == "ApiKey key-123"
-    )
+    assert _RecordingAsyncClient.requests[0]["headers"]["Authorization"] == "ApiKey key-123"
 
 
 @pytest.mark.asyncio
@@ -140,9 +129,7 @@ async def test_get_parses_dataset_response(monkeypatch: pytest.MonkeyPatch) -> N
             )
         ]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaDatasetsClient("http://kibana:5601")
     response = await client.get("dataset-1")
@@ -165,21 +152,14 @@ async def test_get_parses_dataset_response(monkeypatch: pytest.MonkeyPatch) -> N
         updated_at="2026-01-01T00:00:00Z",
     )
     assert _RecordingAsyncClient.requests[0]["method"] == "GET"
-    assert (
-        _RecordingAsyncClient.requests[0]["url"]
-        == "http://kibana:5601/internal/evals/datasets/dataset-1"
-    )
+    assert _RecordingAsyncClient.requests[0]["url"] == "http://kibana:5601/internal/evals/datasets/dataset-1"
     assert "Authorization" not in _RecordingAsyncClient.requests[0]["headers"]
 
 
 @pytest.mark.asyncio
 async def test_get_404_raises_non_retryable(monkeypatch: pytest.MonkeyPatch) -> None:
-    _RecordingAsyncClient.configure(
-        [httpx.Response(status_code=404, json={"message": "not found"})]
-    )
-    monkeypatch.setattr(
-        "elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    _RecordingAsyncClient.configure([httpx.Response(status_code=404, json={"message": "not found"})])
+    monkeypatch.setattr("elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaDatasetsClient("http://kibana:5601")
     with pytest.raises(DatasetSyncError) as exc_info:
@@ -208,9 +188,7 @@ async def test_get_503_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) ->
             ),
         ]
     )
-    monkeypatch.setattr(
-        "elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient
-    )
+    monkeypatch.setattr("elastic_evals.api.datasets_client.httpx.AsyncClient", _RecordingAsyncClient)
 
     client = KibanaDatasetsClient("http://kibana:5601")
     response = await client.get("dataset-1")

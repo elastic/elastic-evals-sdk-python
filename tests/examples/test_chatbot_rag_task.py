@@ -1,3 +1,7 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 from __future__ import annotations
 
 import json
@@ -59,9 +63,7 @@ async def test_chatbot_rag_task_parses_sse(monkeypatch: pytest.MonkeyPatch) -> N
     ) -> _FakeStreamResponse:
         del self, headers
         assert method == "POST"
-        assert url.startswith(
-            f"{chatbot_rag_module.CHATBOT_APP_URL}/api/chat?session_id="
-        )
+        assert url.startswith(f"{chatbot_rag_module.CHATBOT_APP_URL}/api/chat?session_id=")
         assert json == {"question": "What is our working from home policy?"}
         return _FakeStreamResponse(lines)
 

@@ -7,15 +7,16 @@
 from elastic_evals.api.constants import (
     DATASET_UUID_NAMESPACE,
     EVALS_API_VERSION,
-    EVALS_DATASETS_URL,
     EVALS_DATASET_UPSERT_URL,
     EVALS_DATASET_URL,
+    EVALS_DATASETS_URL,
     EVALS_INTERNAL_URL,
     EVALS_SCORES_URL,
     MAX_EXAMPLES_PER_DATASET,
     MAX_INGEST_BATCH_SIZE,
     SCORE_INGEST_PAYLOAD_CAP_BYTES,
 )
+from elastic_evals.api.datasets_client import KibanaDatasetsClient, compute_dataset_id
 from elastic_evals.api.datasets_models import (
     DatasetExample,
     GetDatasetResponse,
@@ -23,7 +24,6 @@ from elastic_evals.api.datasets_models import (
     UpsertDatasetRequest,
     UpsertDatasetResponse,
 )
-from elastic_evals.api.datasets_client import KibanaDatasetsClient, compute_dataset_id
 from elastic_evals.api.errors import DatasetSyncError, IngestScoresError
 from elastic_evals.api.headers import build_kibana_headers
 from elastic_evals.api.scores_models import (

@@ -29,11 +29,7 @@ def _collect_run_scripts(examples_root: Path) -> list[tuple[str, str]]:
         if not path.is_file():
             continue
         relative = path.relative_to(examples_root)
-        suite_id = (
-            relative.parent.as_posix()
-            if relative.name == "run.py"
-            else relative.as_posix()
-        )
+        suite_id = relative.parent.as_posix() if relative.name == "run.py" else relative.as_posix()
         runs.append((suite_id, str(path)))
     return runs
 
@@ -60,9 +56,7 @@ def list_cmd() -> None:
     examples_root = _find_examples_root()
     if not examples_root:
         if not discovery.suites:
-            raise click.ClickException(
-                "Could not locate examples folder or entry-point suites."
-            )
+            raise click.ClickException("Could not locate examples folder or entry-point suites.")
         return
 
     runs = _collect_run_scripts(examples_root)

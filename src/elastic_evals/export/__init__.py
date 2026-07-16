@@ -15,6 +15,7 @@ from elastic_evals.api import (
     Model,
     RunMetadata,
 )
+
 from .documents import build_ingest_score_item
 from .git_metadata import GitMetadata, get_git_metadata
 

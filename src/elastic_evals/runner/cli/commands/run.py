@@ -30,9 +30,7 @@ def _validate_positive_int(value: int | None, name: str) -> int | None:
     return value
 
 
-def _apply_overrides(
-    overrides: dict[str, str], env: dict[str, str], keys: Iterable[str]
-) -> None:
+def _apply_overrides(overrides: dict[str, str], env: dict[str, str], keys: Iterable[str]) -> None:
     for key in keys:
         if key in overrides:
             env[key] = overrides[key]
@@ -60,9 +58,7 @@ def _temporary_env(overrides: dict[str, str]) -> Iterator[None]:
     required=False,
     type=click.Path(exists=True, dir_okay=False, readable=True),
 )
-@click.option(
-    "--suite", help="Suite ID registered via elastic_evals.suites entry points."
-)
+@click.option("--suite", help="Suite ID registered via elastic_evals.suites entry points.")
 @click.option("--run-id", help="Override run ID used by elastic-evals.")
 @click.option("--repetitions", "-r", type=int, help="Number of repetitions.")
 @click.option("--concurrency", "-c", type=int, help="Concurrency level.")

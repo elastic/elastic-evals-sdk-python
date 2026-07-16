@@ -1,11 +1,15 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 """Chatbot RAG example suite plugin."""
 
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 from elastic_evals.runner.suites import EvaluationSuite
 
@@ -29,8 +33,6 @@ def _run_chatbot_rag_example() -> None:
 def get_suite() -> EvaluationSuite:
     return EvaluationSuite(
         id="chatbot-rag-eval-example",
-        description=(
-            "Chatbot RAG app evaluation suite (examples/chatbot_rag_app/run.py)."
-        ),
+        description=("Chatbot RAG app evaluation suite (examples/chatbot_rag_app/run.py)."),
         run=_run_chatbot_rag_example,
     )

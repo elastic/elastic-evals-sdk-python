@@ -77,17 +77,13 @@ def build_ingest_score_item(
                 task=IngestTask(
                     repetition_index=task_run.repetition,
                     trace_id=task_run.trace_id,
-                    output=task_run.output
-                    if isinstance(task_run.output, dict)
-                    else None,
+                    output=task_run.output if isinstance(task_run.output, dict) else None,
                 ),
                 evaluator=IngestEvaluator(
                     name=evaluation_run.name,
                     score=evaluator_result.score if evaluator_result else None,
                     label=evaluator_result.label if evaluator_result else None,
-                    explanation=evaluator_result.explanation
-                    if evaluator_result
-                    else None,
+                    explanation=evaluator_result.explanation if evaluator_result else None,
                     metadata=evaluator_result.metadata if evaluator_result else None,
                     trace_id=evaluation_run.trace_id,
                 ),
