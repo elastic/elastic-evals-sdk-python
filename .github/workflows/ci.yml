@@ -10,6 +10,22 @@ permissions:
   contents: read
 
 jobs:
+  license-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check license headers
+        run: |
+          missing=$(grep -rL "Licensed under the Elastic License 2.0" \
+            --include="*.py" \
+            --exclude-dir=".venv" --exclude-dir="dist" --exclude-dir="build" \
+            .)
+          if [ -n "$missing" ]; then
+            echo "Files missing Elastic License 2.0 header:"
+            echo "$missing"
+            exit 1
+          fi
+
   pre-commit:
     runs-on: ubuntu-latest
     steps:
