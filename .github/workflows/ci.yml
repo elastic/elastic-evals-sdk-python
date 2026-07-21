@@ -19,7 +19,7 @@ jobs:
           missing=$(grep -rL "Licensed under the Elastic License 2.0" \
             --include="*.py" \
             --exclude-dir=".venv" --exclude-dir="dist" --exclude-dir="build" \
-            .)
+            . || true)
           if [ -n "$missing" ]; then
             echo "Files missing Elastic License 2.0 header:"
             echo "$missing"
