@@ -1,10 +1,11 @@
 name: Set Workstream field to Evals
 
-# Adds every new issue to the "Nightshift: Context and Research" project and sets the relevant Workstream field
 
 on:
   issues:
     types: [opened]
+
+permissions: {}
 
 env:
   CONTEXT_RESEARCH_PROJECT_ID: 'PVT_kwDOAGc3Zs4BbAmj'
@@ -33,6 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CONTEXT_RESEARCH_PROJECT_TOKEN }}
 
       - uses: octokit/graphql-action@ddde8ebb2493e79f390e6449c725c21663a67505 # v3.0.2
+        if: steps.add_to_project.outcome == 'success'
         with:
           query: |
             mutation SetWorkstream($item_id: ID!, $project_id: ID!, $field_id: ID!, $option_id: String) {
