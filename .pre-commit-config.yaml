@@ -5,3 +5,12 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: license-headers
+        name: Check Elastic License 2.0 headers
+        entry: bash -c 'missing=$(grep -L "Licensed under the Elastic License 2.0" "$@"); if [ -n "$missing" ]; then echo "Files missing Elastic License 2.0 header:"; echo "$missing"; exit 1; fi' --
+        language: system
+        types: [python]
+        exclude: ^(\.venv|dist|build)/
