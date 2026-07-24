@@ -201,7 +201,12 @@ async def test_runner_end_to_end(
         return EvaluationResult(score=1.0)
 
     evaluator = SimpleEvaluator(name="echo", kind="CODE", evaluate=evaluate)
-    result = await client.run_experiment(dataset=dataset, task=task, evaluators=[evaluator])
+    result = await client.run_experiment(
+        dataset=dataset,
+        task=task,
+        evaluators=[evaluator],
+        experiment_name="Tiny named experiment",
+    )
 
     assert len(result.evaluation_runs) == 2
     assert all(run.result is not None for run in result.evaluation_runs)
@@ -231,6 +236,7 @@ async def test_runner_end_to_end(
     second_score = fake_kibana["scores"][1]["body"]
 
     assert first_score["metadata"]["execution_id"] == "run-123"
+    assert first_score["experiment_name"] == "Tiny named experiment"
     assert first_score["scores"][0]["example"]["dataset"]["id"] == compute_dataset_id("tiny")
     assert first_score["scores"][0]["example"]["id"] == "upstream-example-1"
     assert first_score["scores"][0]["example"]["index"] == 0

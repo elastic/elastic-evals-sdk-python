@@ -99,6 +99,7 @@ class ElasticEvalsClient:
         dataset: EvaluationDataset,
         task: ExperimentTask,
         evaluators: list[Evaluator],
+        experiment_name: str | None = None,
         metadata: dict[str, Any] | None = None,
         concurrency: int | None = None,
     ) -> RanExperiment:
@@ -208,6 +209,7 @@ class ElasticEvalsClient:
                         example_input=self._dict_or_none(example.input),
                         task_run=task_run,
                         evaluation_run=evaluation_runs[-1],
+                        experiment_name=experiment_name,
                     )
                     await self._scores_client.ingest_scores(score_payload)
                     log_evaluator_complete(evaluator.name, example_index, repetition)

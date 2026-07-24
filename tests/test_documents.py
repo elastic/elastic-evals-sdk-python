@@ -47,10 +47,12 @@ def test_build_ingest_score_item_matches_scores_contract() -> None:
             ),
             trace_id="eval-trace",
         ),
+        experiment_name="named experiment",
     )
 
     assert payload.model_dump(exclude_none=True) == {
         "experiment_id": "exp-1",
+        "experiment_name": "named experiment",
         "task_model": {"id": "task-model", "family": "gpt", "provider": "openai"},
         "evaluator_model": {"id": "eval-model", "family": "gpt", "provider": "openai"},
         "metadata": {

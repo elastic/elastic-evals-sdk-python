@@ -42,6 +42,7 @@ def build_ingest_score_item(
     example_input: dict[str, Any] | None,
     task_run: RunData,
     evaluation_run: EvaluationRun,
+    experiment_name: str | None = None,
 ) -> IngestScoresRequest:
     evaluator_result = evaluation_run.result
 
@@ -63,6 +64,7 @@ def build_ingest_score_item(
 
     return IngestScoresRequest(
         experiment_id=experiment_id,
+        experiment_name=experiment_name,
         task_model=task_model,
         evaluator_model=evaluator_model,
         metadata=metadata,

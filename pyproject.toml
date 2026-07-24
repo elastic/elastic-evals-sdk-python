@@ -17,10 +17,20 @@ dependencies = [
     "httpx>=0.25",
     "tenacity>=8.0",
     "aiohttp>=3.13.3",
+    "pandas-stubs~=3.0.3",
 ]
 
 [project.optional-dependencies]
 runner = ["click>=8.4.2"]
+poc = [
+    "datasets>=5.0.0",
+    "ipykernel>=7.3.0",
+    "loguru>=0.7.3",
+    "opik>=2.1.32",
+    "orca",
+    "pandas>=3.0.3",
+    "python-dotenv>=1.2.2",
+]
 
 [dependency-groups]
 dev = [
@@ -78,3 +88,9 @@ min-file-size = 2
 
 [tool.ruff.lint.isort]
 known-first-party = ["elastic_evals"]
+
+[tool.uv]
+environments = ["python_version >= '3.12'"]
+
+[tool.uv.sources]
+orca = { path = "../orca", editable = true }
