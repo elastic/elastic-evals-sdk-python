@@ -14,12 +14,9 @@ pytest.importorskip("orca")
 
 from elastic_evals.api import (  # noqa: E402
     Environment,
-    EvaluateResponse,
     EvaluatorDefinition,
     Model,
-    ResolveInstrumentationResponse,
     RunMetadata,
-    ValidateEvaluatorsResponse,
 )
 from elastic_evals.config import ElasticEvalsConfig  # noqa: E402
 from elastic_evals.types import (  # noqa: E402
@@ -134,11 +131,11 @@ async def test_document_recall_evaluator_is_unavailable_without_ground_truth() -
     }
 
 
-def _executed_run() -> granular_run.ExecutedRun:
-    return granular_run.ExecutedRun(
-        key="run-key",
-        example_id="example-1",
-        data=RunData(
+def _executed_run() -> dict[str, Any]:
+    return {
+        "key": "run-key",
+        "example_id": "example-1",
+        "data": RunData(
             example_index=0,
             repetition=0,
             input={"question": "How do I configure my Wix site?"},
@@ -147,7 +144,7 @@ def _executed_run() -> granular_run.ExecutedRun:
             output={"steps": [_tool_step("doc-1", "doc-9")]},
             trace_id="1" * 32,
         ),
-    )
+    }
 
 
 def test_granular_score_request_preserves_experiment_name_and_batches_scores() -> None:
@@ -164,16 +161,19 @@ def test_granular_score_request_preserves_experiment_name_and_batches_scores() -
         ),
     ]
 
-    payload = granular_run._build_score_request(
-        experiment_id="experiment-1",
-        experiment_name="Granular experiment",
-        config=config,
-        dataset_id="dataset-1",
-        dataset_name="dataset",
-        task_model=Model(id="task-model"),
+    context = {
+        "config": config,
+        "experiment_id": "experiment-1",
+        "experiment_name": "Granular experiment",
+        "dataset_id": "dataset-1",
+        "dataset_name": "dataset",
+        "task_model": Model(id="task-model"),
+        "run_metadata": RunMetadata(total_repetitions=1),
+        "environment": Environment(hostname="host"),
+    }
+    payload = granular_run._score_request(
+        context,
         evaluator_model=Model(id="evaluator-model"),
-        run_metadata=RunMetadata(total_repetitions=1),
-        environment=Environment(hostname="host"),
         scored_runs=scored_runs,
     )
 
@@ -204,72 +204,7 @@ def test_granular_orca_scores_are_namespaced_and_use_stored_run() -> None:
     )
 
 
-@pytest.mark.asyncio
-async def test_granular_kibana_evaluation_uses_reference_data_and_llm_connector() -> None:
-    class FakeEvaluatorsClient:
-        evaluate_payload: Any = None
-
-        async def resolve_instrumentation(self, trace_id: str) -> ResolveInstrumentationResponse:
-            assert trace_id == "1" * 32
-            return ResolveInstrumentationResponse.model_validate(
-                {
-                    "profiles": [],
-                    "recommended_instrumentation": {"profile": "elastic-inference"},
-                }
-            )
-
-        async def validate(self, payload) -> ValidateEvaluatorsResponse:
-            assert payload.subject.traces[0].reference_data == {"expected": "Use the site settings."}
-            return ValidateEvaluatorsResponse.model_validate(
-                {
-                    "evaluators": [
-                        {
-                            "name": "correctness",
-                            "version": "1.0.0",
-                            "ready": True,
-                            "unmet": [],
-                        },
-                        {
-                            "name": "latency",
-                            "version": "1.0.0",
-                            "ready": True,
-                            "unmet": [],
-                        },
-                    ]
-                }
-            )
-
-        async def evaluate(self, payload) -> EvaluateResponse:
-            self.evaluate_payload = payload
-            return EvaluateResponse.model_validate(
-                {
-                    "results": [
-                        {
-                            "status": "ok",
-                            "evaluator": {
-                                "name": "correctness",
-                                "version": "1.0.0",
-                                "kind": "llm",
-                            },
-                            "scores": [{"name": "factuality", "score": 1.0}],
-                        },
-                        {
-                            "status": "error",
-                            "evaluator": {
-                                "name": "latency",
-                                "version": "1.0.0",
-                                "kind": "code",
-                            },
-                            "error": {
-                                "code": "evidence_unmet",
-                                "message": "latency unavailable",
-                            },
-                        },
-                    ]
-                }
-            )
-
-    client = FakeEvaluatorsClient()
+def test_granular_evaluator_configs_use_reference_data_and_llm_connector() -> None:
     definitions = [
         EvaluatorDefinition(
             name="correctness",
@@ -285,20 +220,17 @@ async def test_granular_kibana_evaluation_uses_reference_data_and_llm_connector(
         ),
     ]
 
-    scored_runs = await granular_run._evaluate_with_kibana(
-        client=client,  # type: ignore[arg-type]
-        definitions=definitions,
-        executed_runs=[_executed_run()],
-        connector_id="judge-connector",
-        concurrency=1,
+    validate_configs, evaluate_configs = granular_run._evaluator_configs(
+        definitions,
+        "judge-connector",
     )
 
-    assert client.evaluate_payload is not None
-    assert [evaluator.connector_id for evaluator in client.evaluate_payload.evaluators] == ["judge-connector", None]
-    assert len(scored_runs) == 1
-    assert scored_runs[0][1].name == "factuality"
-    assert scored_runs[0][1].result
-    assert scored_runs[0][1].result.score == 1.0
+    assert [config.name for config in validate_configs] == ["correctness", "latency"]
+    assert [config.connector_id for config in evaluate_configs] == [
+        "judge-connector",
+        None,
+    ]
+    assert granular_run._reference_data(_executed_run()["data"].expected) == {"expected": "Use the site settings."}
 
 
 def test_granular_workflow_does_not_call_run_experiment() -> None:
