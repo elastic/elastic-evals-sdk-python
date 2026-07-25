@@ -10,9 +10,9 @@ import asyncio
 import socket
 import uuid
 from collections.abc import Iterable, Mapping
-from pathlib import Path
 from typing import Any, cast
 
+import httpx
 import pandas as pd
 from dotenv import load_dotenv
 from orca.evaluation.evaluators.retrieval import F1AtK, PrecisionAtK, RecallAtK  # type: ignore[import-untyped]
@@ -25,6 +25,7 @@ from elastic_evals.agent_builder import (
     CreateToolRequest,
     IndexSearchToolConfig,
     ToolSelection,
+    build_agent_builder_headers,
 )
 from elastic_evals.api import (
     Environment,
@@ -46,16 +47,27 @@ from elastic_evals.api import (
 )
 from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
+from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.export import build_ingest_score_item, get_git_metadata
 from elastic_evals.indexing import get_elasticsearch_client
 from elastic_evals.tracing import init_tracing, with_evaluator_span, with_task_span
-from elastic_evals.types import EvaluationResult, EvaluationRun, EvaluatorParams, Example, RunData
-from examples.opik_vs_elastic import run as managed_run  # TODO: I don't want this script to be dependent on run.py...
+from elastic_evals.types import EvaluationResult, EvaluationRun, Evaluator, EvaluatorParams, Example, RunData
+from examples.opik_vs_elastic.helpers.helpers import (
+    AGENT_ID,
+    AGENT_INSTRUCTIONS,
+    AGENT_NAME,
+    ENV_PATH,
+    GROUND_TRUTH_COLUMN,
+    INDEX_NAME,
+    SEARCH_TOOL_DESCRIPTION,
+    SEARCH_TOOL_ID,
+    WIX_KNOWLEDGE_BASE_PATH,
+    WIX_QA_DATASET_PATH,
+    _extract_retrieved_doc_ids,  # noqa: PLC2701
+    _parse_relevant_doc_ids,  # noqa: PLC2701
+    _to_string_list,  # noqa: PLC2701
+)
 
-ENV_PATH = Path(__file__).parent / ".env"
-GROUND_TRUTH_COLUMN = managed_run.GROUND_TRUTH_COLUMN
-INDEX_NAME = managed_run.INDEX_NAME
-SEARCH_TOOL_ID = managed_run.SEARCH_TOOL_ID
 EXPERIMENT_NAME = "Wix QA - granular Evaluators and Scores API workflow"
 DATASET_NAME = "wix_qa_granular_smoke"
 DATASET_DESCRIPTION = "Small Wix QA sample for the granular API workflow."
@@ -70,6 +82,81 @@ KIBANA_EVALUATOR_NAMES = (
     "output_tokens",
     "tool_calls",
 )
+
+
+def create_document_recall_evaluator(*, tool_id: str) -> Evaluator:
+    async def evaluate(params: EvaluatorParams) -> EvaluationResult:
+        expected = _to_string_list((params.metadata or {}).get("relevant_doc_ids"))
+        retrieved = _extract_retrieved_doc_ids(params.output, tool_id=tool_id)
+
+        if not expected:
+            return EvaluationResult(
+                score=None,
+                label="unavailable",
+                explanation="No relevant document IDs available",
+                metadata={
+                    "expected_document_ids": expected,
+                    "retrieved_document_ids": retrieved,
+                },
+            )
+
+        retrieved_set = set(retrieved)
+        matched = [document_id for document_id in expected if document_id in retrieved_set]
+        missing = [document_id for document_id in expected if document_id not in retrieved_set]
+        score = len(matched) / len(expected)
+        label = "PASS" if score == 1.0 else "PARTIAL" if score > 0 else "FAIL"
+
+        return EvaluationResult(
+            score=score,
+            label=label,
+            metadata={
+                "expected_document_ids": expected,
+                "retrieved_document_ids": retrieved,
+                "matched_document_ids": matched,
+                "missing_document_ids": missing,
+            },
+        )
+
+    return SimpleEvaluator(name="DocumentRecall", kind="CODE", evaluate=evaluate)
+
+
+async def agent_builder_task(
+    example: Example, config: ElasticEvalsConfig, agent_id: str | None = None
+) -> dict[str, Any]:
+    """Call Agent Builder API and return response."""
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{config.kibana_url}/api/agent_builder/converse",
+            json={
+                "connector_id": config.connector_id,
+                "agent_id": config.agent_id if agent_id is None else agent_id,
+                "input": example.input.get("question"),
+            },
+            headers=build_agent_builder_headers(config.kibana_api_key),
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+    response_payload = data.get("response", {})
+    message = response_payload.get("message")
+    raw_trace_id = data.get("trace_id") or data.get("traceId")
+    if isinstance(raw_trace_id, list):
+        trace_id = next((value for value in raw_trace_id if isinstance(value, str)), None)
+    else:
+        trace_id = raw_trace_id if isinstance(raw_trace_id, str) else None
+
+    task_output = {
+        "messages": [{"message": message}] if message is not None else [],
+        "steps": data.get("steps", []),
+        "traceId": trace_id,
+        "conversation_id": data.get("conversation_id"),
+    }
+
+    if trace_id:
+        task_output["_interaction_trace_id"] = trace_id
+    return task_output
 
 
 def _task_model(config: ElasticEvalsConfig) -> Model:
@@ -249,8 +336,8 @@ def _evaluate_with_orca(
     scored: list[tuple[dict[str, Any], EvaluationRun]] = []
     for executed in executed_runs:
         run_data = executed["data"]
-        retrieved = managed_run._extract_retrieved_doc_ids(run_data.output, tool_id=SEARCH_TOOL_ID)
-        relevant = managed_run._to_string_list((run_data.metadata or {}).get("relevant_doc_ids"))
+        retrieved = _extract_retrieved_doc_ids(run_data.output, tool_id=SEARCH_TOOL_ID)
+        relevant = _to_string_list((run_data.metadata or {}).get("relevant_doc_ids"))
         evidence = _orca_evidence(retrieved)
         harness = {
             "name": "agent_builder_converse",
@@ -292,12 +379,9 @@ async def main() -> None:
     config = ElasticEvalsConfig.from_env()
     init_tracing(config.tracing)
 
-    qa_wix = pd.read_csv("gs://agent-builder-data-science-datasets/queries/wix_qa.csv")
-    qa_wix["relevant_doc_ids"] = qa_wix[GROUND_TRUTH_COLUMN].apply(managed_run._parse_relevant_doc_ids)
-    kb_wix = pd.read_csv(
-        "gs://agent-builder-data-science-datasets/knowledge_bases/cleaned/"
-        "customer_support/wix_knowledge_base/wix_knowledge_base.csv"
-    )
+    qa_wix = pd.read_csv(WIX_QA_DATASET_PATH)
+    qa_wix["relevant_doc_ids"] = qa_wix[GROUND_TRUTH_COLUMN].apply(_parse_relevant_doc_ids)
+    kb_wix = pd.read_csv(WIX_KNOWLEDGE_BASE_PATH)
     es_client = get_elasticsearch_client()
     es_client.create_index(INDEX_NAME, mappings=None, recreate=True)
     records = cast(Iterable[Mapping[str, Any]], kb_wix.to_dict(orient="records"))
@@ -342,17 +426,17 @@ async def main() -> None:
         CreateToolRequest(
             id=SEARCH_TOOL_ID,
             type="index_search",
-            description="Search the Wix knowledge base articles.",
+            description=SEARCH_TOOL_DESCRIPTION,
             configuration=IndexSearchToolConfig(pattern=INDEX_NAME),
         )
     )
     agent = await agent_builder_client.get_or_create_agent(
         CreateAgentRequest(
-            id="wix-eval-agent",
-            name="Wix Agent",
+            id=AGENT_ID,
+            name=AGENT_NAME,
             description="Agent for Wix QA retrieval.",
             configuration=AgentConfiguration(
-                instructions="Answer questions using the Wix knowledge base.",
+                instructions=AGENT_INSTRUCTIONS,
                 tools=[ToolSelection(tool_ids=[tool.id])],
             ),
         )
@@ -385,7 +469,7 @@ async def main() -> None:
             )
 
             async def task_runner() -> dict[str, Any]:
-                return await managed_run.agent_builder_task(
+                return await agent_builder_task(
                     sdk_example,
                     config,
                     agent_id=agent.id,
@@ -418,7 +502,7 @@ async def main() -> None:
             )
 
     print("[5] Evaluate stored runs with Kibana and Document Recall")
-    document_recall = managed_run.create_document_recall_evaluator(tool_id=SEARCH_TOOL_ID)
+    document_recall = create_document_recall_evaluator(tool_id=SEARCH_TOOL_ID)
     kibana_scores: list[tuple[dict[str, Any], EvaluationRun]] = []
     document_recall_scores: list[tuple[dict[str, Any], EvaluationRun]] = []
 

@@ -4,10 +4,8 @@
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import os
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -50,91 +48,26 @@ from elastic_evals.types import (
     EvaluatorParams,
     Example,
 )
+from examples.opik_vs_elastic.helpers.helpers import (
+    AGENT_ID,
+    AGENT_INSTRUCTIONS,
+    AGENT_NAME,
+    ENV_PATH,
+    GROUND_TRUTH_COLUMN,
+    INDEX_NAME,
+    SEARCH_TOOL_DESCRIPTION,
+    SEARCH_TOOL_ID,
+    WIX_KNOWLEDGE_BASE_PATH,
+    WIX_QA_DATASET_PATH,
+    _extract_retrieved_doc_ids,  # noqa: PLC2701
+    _parse_relevant_doc_ids,  # noqa: PLC2701
+    _to_string_list,  # noqa: PLC2701
+)
 
-INDEX_NAME = "wix_knowledge_base"
-SEARCH_TOOL_ID = "wix-knowledge-search"
-MAPPINGS_PATH = Path(__file__).parent / "configs" / "wix_knowledge_base_mappings.json"
-ENV_PATH = Path(__file__).parent / ".env"
-GROUND_TRUTH_COLUMN = "gt_customer_support_wix_knowledge_base"
 WIX_RESPONSE_CRITERIA = [
     "The response directly addresses the user's Wix support question.",
     "The response provides clear and actionable guidance.",
 ]
-
-
-def _parse_relevant_doc_ids(value: Any) -> list[str]:
-    if value is None:
-        return []
-
-    parsed = value
-    if isinstance(value, str):
-        if not value.strip():
-            return []
-        try:
-            parsed = ast.literal_eval(value)
-        except (SyntaxError, ValueError) as exc:
-            raise ValueError("Wix document ground truth must be a dictionary") from exc
-
-    if not isinstance(parsed, dict):
-        return []
-
-    return [str(document_id) for document_id, relevant in parsed.items() if relevant]
-
-
-def _to_string_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return list(dict.fromkeys(item for item in value if isinstance(item, str)))
-
-
-def _reference_id(value: Any) -> str | None:
-    if not isinstance(value, dict):
-        return None
-    document_id = value.get("id")
-    return document_id if isinstance(document_id, str) else None
-
-
-def _extract_retrieved_doc_ids(output: Any, *, tool_id: str) -> list[str]:
-    if not isinstance(output, dict):
-        return []
-
-    retrieved: list[str] = []
-    steps = output.get("steps")
-    if not isinstance(steps, list):
-        return retrieved
-
-    for step in steps:
-        if not isinstance(step, dict):
-            continue
-        if step.get("type") != "tool_call" or step.get("tool_id") != tool_id:
-            continue
-
-        results = step.get("results")
-        if not isinstance(results, list):
-            continue
-
-        for result in results:
-            if not isinstance(result, dict):
-                continue
-            data = result.get("data")
-            if not isinstance(data, dict):
-                continue
-
-            direct_id = _reference_id(data.get("reference"))
-            if direct_id:
-                retrieved.append(direct_id)
-
-            resources = data.get("resources")
-            if not isinstance(resources, list):
-                continue
-            for resource in resources:
-                if not isinstance(resource, dict):
-                    continue
-                resource_id = _reference_id(resource.get("reference"))
-                if resource_id:
-                    retrieved.append(resource_id)
-
-    return list(dict.fromkeys(retrieved))
 
 
 def create_document_recall_evaluator(*, tool_id: str) -> Evaluator:
@@ -218,15 +151,13 @@ async def main() -> None:
 
     # (1) Prepare data:
     print("\nLoading QA pairs from GCS (wix_qa dataset)...")
-    qa_wix = pd.read_csv("gs://agent-builder-data-science-datasets/queries/wix_qa.csv")
+    qa_wix = pd.read_csv(WIX_QA_DATASET_PATH)
     qa_wix["relevant_doc_ids"] = qa_wix[GROUND_TRUTH_COLUMN].apply(_parse_relevant_doc_ids)
     print(f"Dataset shape: {qa_wix.shape}")  # output: (52, 5)
     # print(qa_wix.head())
 
     print("\nLoading knowledge base from GCS (wix_knowledge_base dataset)...")
-    kb_wix = pd.read_csv(
-        "gs://agent-builder-data-science-datasets/knowledge_bases/cleaned/customer_support/wix_knowledge_base/wix_knowledge_base.csv"
-    )
+    kb_wix = pd.read_csv(WIX_KNOWLEDGE_BASE_PATH)
     print(f"Dataset shape: {kb_wix.shape}")  # output: (6222, 4)
     # print(kb_wix.head())
 
@@ -321,18 +252,18 @@ async def main() -> None:
         CreateToolRequest(
             id=SEARCH_TOOL_ID,
             type="index_search",
-            description="Search the Wix knowledge base articles.",
+            description=SEARCH_TOOL_DESCRIPTION,
             configuration=IndexSearchToolConfig(pattern=INDEX_NAME),
         )
     )
     print("Creating agent")
     agent = await ab_client.get_or_create_agent(
         CreateAgentRequest(
-            id="wix-eval-agent",
-            name="Wix Agent",
+            id=AGENT_ID,
+            name=AGENT_NAME,
             description="Agent for wix_qa retrieval documents.",
             configuration=AgentConfiguration(
-                instructions="Answer questions using the Wix knowledge base.",
+                instructions=AGENT_INSTRUCTIONS,
                 tools=[ToolSelection(tool_ids=[tool.id])],
             ),
         )
