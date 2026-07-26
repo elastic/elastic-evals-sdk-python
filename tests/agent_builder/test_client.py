@@ -1,0 +1,346 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
+import httpx
+import pytest
+from tenacity import wait_none
+
+from elastic_evals.agent_builder import (
+    AgentBuilderClient,
+    AgentConfiguration,
+    ConverseResponse,
+    CreateAgentRequest,
+    CreateToolRequest,
+    IndexSearchToolConfig,
+    ToolSelection,
+)
+
+
+class _RecordingAsyncClient:
+    responses: list[httpx.Response | BaseException] = []
+    requests: list[dict[str, Any]] = []
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.timeout = kwargs.get("timeout")
+
+    async def __aenter__(self) -> _RecordingAsyncClient:
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        return None
+
+    async def get(self, url: str, *, headers: dict[str, str]) -> httpx.Response:
+        return self._record("GET", url, headers=headers)
+
+    async def post(
+        self,
+        url: str,
+        *,
+        json: dict[str, Any],
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        return self._record("POST", url, json=json, headers=headers)
+
+    async def put(
+        self,
+        url: str,
+        *,
+        json: dict[str, Any],
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        return self._record("PUT", url, json=json, headers=headers)
+
+    def _record(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        self.requests.append({"method": method, "url": url, "timeout": self.timeout, **kwargs})
+        outcome = self.responses.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+    @classmethod
+    def configure(cls, outcomes: Sequence[httpx.Response | BaseException]) -> None:
+        cls.responses = list(outcomes)
+        cls.requests = []
+
+
+@pytest.fixture(autouse=True)
+def _mock_http_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "elastic_evals.agent_builder.client.httpx.AsyncClient",
+        _RecordingAsyncClient,
+    )
+    monkeypatch.setattr(AgentBuilderClient._create_tool.retry, "wait", wait_none())
+    monkeypatch.setattr(AgentBuilderClient._create_agent.retry, "wait", wait_none())
+    monkeypatch.setattr(AgentBuilderClient.update_tool.retry, "wait", wait_none())
+    monkeypatch.setattr(AgentBuilderClient.update_agent.retry, "wait", wait_none())
+    monkeypatch.setattr(AgentBuilderClient.call_converse.retry, "wait", wait_none())
+
+
+def _tool_request() -> CreateToolRequest:
+    return CreateToolRequest(
+        id="search-documents",
+        type="index_search",
+        description="Search documents",
+        tags=["evaluation"],
+        configuration=IndexSearchToolConfig(pattern="documents-*", row_limit=10),
+    )
+
+
+def _agent_request() -> CreateAgentRequest:
+    return CreateAgentRequest(
+        id="document-agent",
+        name="Document agent",
+        description="Answers questions about documents",
+        configuration=AgentConfiguration(
+            instructions="Use the search tool.",
+            tools=[ToolSelection(tool_ids=["search-documents"])],
+        ),
+        labels=["evaluation"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_tool_creates_missing_tool(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(404, json={"message": "not found"}),
+            httpx.Response(
+                200,
+                json={
+                    "id": "search-documents",
+                    "type": "index_search",
+                    "description": "Search documents",
+                    "readonly": False,
+                    "tags": ["evaluation"],
+                    "configuration": {
+                        "pattern": "documents-*",
+                        "row_limit": 10,
+                    },
+                    "experimental": False,
+                    "schema": {"type": "object"},
+                },
+            ),
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").create_tool(_tool_request())
+
+    assert result.id == "search-documents"
+    assert result.configuration == {"pattern": "documents-*", "row_limit": 10}
+    assert [request["method"] for request in _RecordingAsyncClient.requests] == [
+        "GET",
+        "POST",
+    ]
+    assert "Created Agent Builder tool 'search-documents'" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_create_tool_reuses_existing_tool_by_default(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(
+                200,
+                json={"id": "search-documents", "type": "index_search"},
+            )
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").create_tool(_tool_request())
+
+    assert result.id == "search-documents"
+    assert len(_RecordingAsyncClient.requests) == 1
+    assert "already exists; using it" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_create_tool_updates_existing_tool_when_requested() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(
+                200,
+                json={"id": "search-documents", "type": "index_search"},
+            ),
+            httpx.Response(
+                200,
+                json={
+                    "id": "search-documents",
+                    "type": "index_search",
+                    "description": "Search documents",
+                },
+            ),
+        ]
+    )
+
+    await AgentBuilderClient("http://kibana:5601").create_tool(
+        _tool_request(),
+        update_if_exists=True,
+    )
+
+    assert [request["method"] for request in _RecordingAsyncClient.requests] == [
+        "GET",
+        "PUT",
+    ]
+    assert _RecordingAsyncClient.requests[1]["url"] == ("http://kibana:5601/api/agent_builder/tools/search-documents")
+    assert _RecordingAsyncClient.requests[1]["json"] == {
+        "description": "Search documents",
+        "tags": ["evaluation"],
+        "configuration": {
+            "pattern": "documents-*",
+            "row_limit": 10,
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_tool_rejects_type_change() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(
+                200,
+                json={"id": "search-documents", "type": "esql"},
+            )
+        ]
+    )
+
+    with pytest.raises(ValueError, match="from type 'esql' to 'index_search'"):
+        await AgentBuilderClient("http://kibana:5601").create_tool(
+            _tool_request(),
+            update_if_exists=True,
+        )
+
+    assert len(_RecordingAsyncClient.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_agent_updates_existing_agent_and_returns_metadata() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(
+                200,
+                json={
+                    "id": "document-agent",
+                    "type": "chat",
+                    "name": "Old name",
+                    "readonly": False,
+                    "configuration": {"tools": []},
+                    "permissions": {
+                        "update_agent": True,
+                        "update_access_control": True,
+                    },
+                },
+            ),
+            httpx.Response(
+                200,
+                json={
+                    "id": "document-agent",
+                    "type": "chat",
+                    "name": "Document agent",
+                    "description": "Answers questions about documents",
+                    "readonly": False,
+                    "configuration": {
+                        "instructions": "Use the search tool.",
+                        "tools": [{"tool_ids": ["search-documents"]}],
+                    },
+                    "permissions": {
+                        "update_agent": True,
+                        "update_access_control": True,
+                    },
+                },
+            ),
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").create_agent(
+        _agent_request(),
+        update_if_exists=True,
+    )
+
+    assert result.type == "chat"
+    assert result.configuration is not None
+    assert result.configuration.instructions == "Use the search tool."
+    assert result.permissions == {
+        "update_agent": True,
+        "update_access_control": True,
+    }
+    assert [request["method"] for request in _RecordingAsyncClient.requests] == [
+        "GET",
+        "PUT",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_call_converse_uses_default_agent_and_maps_response() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(
+                200,
+                json={
+                    "response": {
+                        "message": "The answer",
+                        "structured_output": {"answer": 42},
+                    },
+                    "steps": [
+                        {
+                            "type": "tool_call",
+                            "tool_id": "search-documents",
+                            "custom": "preserved",
+                        }
+                    ],
+                    "conversation_id": "8bcbde74-e394-4d5a-a702-5dd8e524dd64",
+                    "trace_id": "trace-1",
+                },
+            )
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").call_converse("What is the answer?")
+
+    assert result == ConverseResponse(
+        message="The answer",
+        steps=[
+            {
+                "type": "tool_call",
+                "tool_id": "search-documents",
+                "custom": "preserved",
+            }
+        ],
+        structured_output={"answer": 42},
+        conversation_id="8bcbde74-e394-4d5a-a702-5dd8e524dd64",
+        trace_id="trace-1",
+    )
+    request = _RecordingAsyncClient.requests[0]
+    assert request["url"] == "http://kibana:5601/api/agent_builder/converse"
+    assert request["json"] == {
+        "input": "What is the answer?",
+        "_execution_mode": "local",
+    }
+
+
+@pytest.mark.asyncio
+async def test_call_converse_forwards_agent_connector_and_conversation() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(200, json={"response": {"message": "Follow-up"}})])
+
+    await AgentBuilderClient("http://kibana:5601").call_converse(
+        "Follow up",
+        agent_id="document-agent",
+        connector_id="connector-1",
+        conversation_id="8bcbde74-e394-4d5a-a702-5dd8e524dd64",
+    )
+
+    assert _RecordingAsyncClient.requests[0]["json"] == {
+        "input": "Follow up",
+        "_execution_mode": "local",
+        "agent_id": "document-agent",
+        "connector_id": "connector-1",
+        "conversation_id": "8bcbde74-e394-4d5a-a702-5dd8e524dd64",
+    }

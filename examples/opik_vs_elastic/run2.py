@@ -422,15 +422,16 @@ async def main() -> None:
     dataset = await datasets_client.get(upserted.dataset_id)
     print(f"Dataset ready: {dataset.name} ({len(dataset.examples)} examples)")
 
-    tool = await agent_builder_client.get_or_create_tool(
+    tool = await agent_builder_client.create_tool(
         CreateToolRequest(
             id=SEARCH_TOOL_ID,
             type="index_search",
             description=SEARCH_TOOL_DESCRIPTION,
             configuration=IndexSearchToolConfig(pattern=INDEX_NAME),
-        )
+        ),
+        update_if_exists=True,
     )
-    agent = await agent_builder_client.get_or_create_agent(
+    agent = await agent_builder_client.create_agent(
         CreateAgentRequest(
             id=AGENT_ID,
             name=AGENT_NAME,
@@ -439,7 +440,8 @@ async def main() -> None:
                 instructions=AGENT_INSTRUCTIONS,
                 tools=[ToolSelection(tool_ids=[tool.id])],
             ),
-        )
+        ),
+        update_if_exists=True,
     )
     print(f"Agent ready: {agent.id} (tool: {tool.id})")
 

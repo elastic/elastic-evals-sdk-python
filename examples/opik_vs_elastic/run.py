@@ -11,7 +11,6 @@ from typing import Any
 import httpx
 import pandas as pd
 from dotenv import load_dotenv
-from orca.clients.agent_builder_client import get_agent_builder_client
 
 from elastic_evals.agent_builder import (
     AgentBuilderClient,
@@ -248,16 +247,17 @@ async def main() -> None:
         api_key=os.environ.get("KIBANA_API_KEY"),
     )
     print("Creating tool for searching the knowledge base...")
-    tool = await ab_client.get_or_create_tool(
+    tool = await ab_client.create_tool(
         CreateToolRequest(
             id=SEARCH_TOOL_ID,
             type="index_search",
             description=SEARCH_TOOL_DESCRIPTION,
             configuration=IndexSearchToolConfig(pattern=INDEX_NAME),
-        )
+        ),
+        update_if_exists=True,
     )
     print("Creating agent")
-    agent = await ab_client.get_or_create_agent(
+    agent = await ab_client.create_agent(
         CreateAgentRequest(
             id=AGENT_ID,
             name=AGENT_NAME,
@@ -266,7 +266,8 @@ async def main() -> None:
                 instructions=AGENT_INSTRUCTIONS,
                 tools=[ToolSelection(tool_ids=[tool.id])],
             ),
-        )
+        ),
+        update_if_exists=True,
     )
 
     print(f"Agent ready: {agent.id} (tool: {tool.id} -> index: {INDEX_NAME})")
@@ -274,12 +275,6 @@ async def main() -> None:
 
     # NOTE: if an agent is created during the script, the configs can be updated on the running to avoid using the default AgentBuilder:
     # config.agent_id = agent.id  # set the agent_id in the config for later use in the task function
-
-    # Check if original orca AgentBuilderClient implementation works:
-    _another_agent = get_agent_builder_client(
-        agent_id=agent.id,
-        connector_id=config.connector_id,
-    )
 
     # (7) Create built-in evaluators:
     correctness_analysis = create_correctness_analysis_evaluator(inference_client=inference_client, log=log)

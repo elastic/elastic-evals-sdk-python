@@ -1,3 +1,7 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 """Shared headers for Kibana Agent Builder public API calls."""
 
 from __future__ import annotations
@@ -17,17 +21,9 @@ def build_agent_builder_headers(api_key: str | None) -> dict[str, str]:
         "x-elastic-internal-origin": "true",
     }
 
-    #headers = {
-        #    "kbn-xsrf": "true",
-        #    "Content-Type": "application/json",
-        #    "x-elastic-internal-origin": "true",
-        #    **propagated_headers(),
-        #}
-
     if api_key:
-        token = base64.b64encode(
-            f"{os.environ['KIBANA_USERNAME']}:{os.environ['KIBANA_PASSWORD']}".encode()
-        ).decode()
+        credentials = f"{os.environ['KIBANA_USERNAME']}:{os.environ['KIBANA_PASSWORD']}"
+        token = base64.b64encode(credentials.encode()).decode()
         headers["Authorization"] = f"Basic {token}"
         # headers["Authorization"] = f"ApiKey {api_key}"
 
