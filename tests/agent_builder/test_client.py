@@ -4,21 +4,26 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from typing import Any
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from tenacity import wait_none
 
 from elastic_evals.agent_builder import (
     AgentBuilderClient,
+    AgentBuilderError,
     AgentConfiguration,
     ConverseResponse,
     CreateAgentRequest,
     CreateToolRequest,
     IndexSearchToolConfig,
     ToolSelection,
+    UpdateAgentRequest,
+    UpdateToolRequest,
 )
 
 
@@ -344,3 +349,236 @@ async def test_call_converse_forwards_agent_connector_and_conversation() -> None
         "connector_id": "connector-1",
         "conversation_id": "8bcbde74-e394-4d5a-a702-5dd8e524dd64",
     }
+
+
+@pytest.mark.parametrize(
+    ("status_code", "retryable"),
+    [(401, False), (403, False), (429, True), (500, True)],
+)
+@pytest.mark.asyncio
+async def test_get_tool_surfaces_http_errors(status_code: int, retryable: bool) -> None:
+    _RecordingAsyncClient.configure([httpx.Response(status_code, json={"message": "request failed"})])
+
+    with pytest.raises(AgentBuilderError) as exc_info:
+        await AgentBuilderClient("http://kibana:5601").get_tool("search-documents")
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.body == {"message": "request failed"}
+    assert exc_info.value.retryable is retryable
+    assert len(_RecordingAsyncClient.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_tool_surfaces_validation_error() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(404, json={"message": "not found"}),
+            httpx.Response(400, json={"message": "invalid tool configuration"}),
+        ]
+    )
+
+    with pytest.raises(AgentBuilderError) as exc_info:
+        await AgentBuilderClient("http://kibana:5601").create_tool(_tool_request())
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.body == {"message": "invalid tool configuration"}
+    assert [request["method"] for request in _RecordingAsyncClient.requests] == [
+        "GET",
+        "POST",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_update_tool_surfaces_validation_error() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(400, json={"message": "invalid tool configuration"})])
+
+    with pytest.raises(AgentBuilderError) as exc_info:
+        await AgentBuilderClient("http://kibana:5601").update_tool(
+            "search-documents",
+            UpdateToolRequest(configuration={"row_limit": "invalid"}),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.body == {"message": "invalid tool configuration"}
+    assert len(_RecordingAsyncClient.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_tool_recovers_from_already_exists_race() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(404, json={"message": "not found"}),
+            httpx.Response(400, json={"message": "Tool already exists"}),
+            httpx.Response(
+                200,
+                json={"id": "search-documents", "type": "index_search"},
+            ),
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").create_tool(_tool_request())
+
+    assert result.id == "search-documents"
+    assert [request["method"] for request in _RecordingAsyncClient.requests] == [
+        "GET",
+        "POST",
+        "GET",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_create_agent_reuses_existing_agent_by_default(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(
+                200,
+                json={"id": "document-agent", "type": "chat", "name": "Existing agent"},
+            )
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").create_agent(_agent_request())
+
+    assert result.id == "document-agent"
+    assert len(_RecordingAsyncClient.requests) == 1
+    assert "already exists; using it" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_create_agent_creates_missing_agent() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(404, json={"message": "not found"}),
+            httpx.Response(
+                200,
+                json={
+                    "id": "document-agent",
+                    "type": "chat",
+                    "name": "Document agent",
+                    "configuration": {
+                        "instructions": "Use the search tool.",
+                        "tools": [{"tool_ids": ["search-documents"]}],
+                    },
+                },
+            ),
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").create_agent(_agent_request())
+
+    assert result.id == "document-agent"
+    assert [request["method"] for request in _RecordingAsyncClient.requests] == [
+        "GET",
+        "POST",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_update_missing_agent_surfaces_not_found() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(404, json={"message": "Agent document-agent not found"})])
+
+    with pytest.raises(AgentBuilderError) as exc_info:
+        await AgentBuilderClient("http://kibana:5601").update_agent(
+            "document-agent",
+            UpdateAgentRequest(name="Document agent"),
+        )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.body == {"message": "Agent document-agent not found"}
+    assert len(_RecordingAsyncClient.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_tool_rejects_malformed_json_response() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(200, content=b"not-json")])
+
+    with pytest.raises(json.JSONDecodeError):
+        await AgentBuilderClient("http://kibana:5601").get_tool("search-documents")
+
+
+@pytest.mark.asyncio
+async def test_get_agent_rejects_incomplete_response() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(200, json={"type": "chat"})])
+
+    with pytest.raises(ValidationError, match="id"):
+        await AgentBuilderClient("http://kibana:5601").get_agent("document-agent")
+
+
+@pytest.mark.parametrize(
+    ("status_code", "error_message", "arguments"),
+    [
+        (
+            400,
+            "No connector available for chat execution",
+            {"connector_id": "missing-connector"},
+        ),
+        (
+            404,
+            'Agent "missing-agent" not found or not available',
+            {"agent_id": "missing-agent"},
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_call_converse_surfaces_missing_dependency(
+    status_code: int,
+    error_message: str,
+    arguments: dict[str, str],
+) -> None:
+    _RecordingAsyncClient.configure([httpx.Response(status_code, json={"message": error_message})])
+
+    with pytest.raises(AgentBuilderError) as exc_info:
+        await AgentBuilderClient("http://kibana:5601").call_converse(
+            "What is the answer?",
+            **arguments,
+        )
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.body == {"message": error_message}
+    assert len(_RecordingAsyncClient.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_agent_surfaces_missing_tool() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(404, json={"message": "Agent document-agent not found"}),
+            httpx.Response(400, json={"message": "Tool search-documents not found"}),
+        ]
+    )
+
+    with pytest.raises(AgentBuilderError) as exc_info:
+        await AgentBuilderClient("http://kibana:5601").create_agent(_agent_request())
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.body == {"message": "Tool search-documents not found"}
+    assert [request["method"] for request in _RecordingAsyncClient.requests] == [
+        "GET",
+        "POST",
+    ]
+
+
+@pytest.mark.parametrize(("status_code", "attempts"), [(400, 1), (500, 3)])
+@pytest.mark.asyncio
+async def test_call_converse_surfaces_failure(status_code: int, attempts: int) -> None:
+    _RecordingAsyncClient.configure(
+        [httpx.Response(status_code, json={"message": "Converse failed"}) for _ in range(attempts)]
+    )
+
+    with pytest.raises(AgentBuilderError) as exc_info:
+        await AgentBuilderClient("http://kibana:5601").call_converse("What is the answer?")
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.retryable is (status_code == 500)
+    assert len(_RecordingAsyncClient.requests) == attempts
+
+
+@pytest.mark.asyncio
+async def test_call_converse_maps_empty_response() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(200, json={})])
+
+    result = await AgentBuilderClient("http://kibana:5601").call_converse("What is the answer?")
+
+    assert result == ConverseResponse()

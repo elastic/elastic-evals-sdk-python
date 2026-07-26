@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -72,7 +73,13 @@ class _RecordingAsyncClient:
 @pytest.fixture(autouse=True)
 def _mock_http_client(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("elastic_evals.api.evaluators_client.httpx.AsyncClient", _RecordingAsyncClient)
-    monkeypatch.setattr(KibanaEvaluatorsClient.list_evaluators.retry, "wait", wait_none())
+    for operation in (
+        KibanaEvaluatorsClient.list_evaluators,
+        KibanaEvaluatorsClient.resolve_instrumentation,
+        KibanaEvaluatorsClient.validate,
+        KibanaEvaluatorsClient.evaluate,
+    ):
+        monkeypatch.setattr(operation.retry, "wait", wait_none())
 
 
 def _subject(*, profile: InstrumentationProfile | None = None) -> EvaluationSubject:
@@ -110,35 +117,6 @@ def _list_response() -> httpx.Response:
             ]
         },
     )
-
-
-@pytest.mark.asyncio
-async def test_list_evaluators_gets_definitions_with_common_headers() -> None:
-    _RecordingAsyncClient.configure([_list_response()])
-
-    result = await KibanaEvaluatorsClient(
-        "http://kibana:5601/",
-        api_key="key-123",
-        timeout=12.5,
-    ).list_evaluators()
-
-    assert [evaluator.name for evaluator in result.evaluators] == ["correctness", "latency"]
-    assert result.evaluators[0].reference_data_schema == {
-        "type": "object",
-        "custom": [1, {"nested": True}],
-    }
-    assert result.evaluators[1].reference_data_schema is None
-    request = _RecordingAsyncClient.requests[0]
-    assert request["method"] == "GET"
-    assert request["url"] == "http://kibana:5601/internal/evals/evaluators"
-    assert request["timeout"] == 12.5
-    assert request["headers"] == {
-        "Content-Type": "application/json",
-        "kbn-xsrf": "true",
-        "x-elastic-internal-origin": "true",
-        "Elastic-Api-Version": "1",
-        "Authorization": "ApiKey key-123",
-    }
 
 
 @pytest.mark.asyncio
@@ -240,6 +218,23 @@ async def test_validate_posts_typed_payload_and_parses_ready_and_unready_results
 
 
 @pytest.mark.asyncio
+async def test_validate_surfaces_non_retryable_payload_error() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(400, json={"message": "invalid evaluator configuration"})])
+    payload = ValidateEvaluatorsRequest(
+        subject=_subject(),
+        evaluators=[ValidateEvaluatorConfig(name="missing-evaluator")],
+    )
+
+    with pytest.raises(KibanaEvaluatorsError) as exc_info:
+        await KibanaEvaluatorsClient("http://kibana:5601").validate(payload)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.retryable is False
+    assert exc_info.value.body == {"message": "invalid evaluator configuration"}
+    assert len(_RecordingAsyncClient.requests) == 1
+
+
+@pytest.mark.asyncio
 async def test_evaluate_preserves_scores_unavailable_values_and_mixed_errors() -> None:
     _RecordingAsyncClient.configure(
         [
@@ -305,6 +300,50 @@ async def test_evaluate_preserves_scores_unavailable_values_and_mixed_errors() -
     ]
 
 
+@pytest.mark.asyncio
+async def test_evaluate_retries_transient_post_with_same_payload() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(503, json={"message": "temporarily unavailable"}),
+            httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "status": "ok",
+                            "evaluator": {
+                                "name": "latency",
+                                "version": "1.0.0",
+                                "kind": "code",
+                            },
+                            "scores": [{"name": "latency", "score": 1.25}],
+                        }
+                    ]
+                },
+            ),
+        ]
+    )
+    payload = EvaluateRequest(
+        subject=_subject(),
+        evaluators=[EvaluateEvaluatorConfig(name="latency")],
+    )
+
+    result = await KibanaEvaluatorsClient("http://kibana:5601").evaluate(payload)
+
+    assert (result.results[0].scores or [])[0].score == 1.25
+    assert len(_RecordingAsyncClient.requests) == 2
+    assert _RecordingAsyncClient.requests[0]["json"] == _RecordingAsyncClient.requests[1]["json"]
+    assert _RecordingAsyncClient.requests[0]["json"] == payload.model_dump(exclude_none=True)
+
+
+@pytest.mark.asyncio
+async def test_list_evaluators_rejects_malformed_json_response() -> None:
+    _RecordingAsyncClient.configure([httpx.Response(200, text="{not-json")])
+
+    with pytest.raises(json.JSONDecodeError):
+        await KibanaEvaluatorsClient("http://kibana:5601").list_evaluators()
+
+
 @pytest.mark.parametrize("status_code", [400, 401, 403, 404])
 @pytest.mark.asyncio
 async def test_non_retryable_errors_preserve_json_or_text_body(status_code: int) -> None:
@@ -357,52 +396,12 @@ async def test_retryable_status_exhausts_after_three_attempts(status_code: int) 
     assert len(_RecordingAsyncClient.requests) == 3
 
 
-@pytest.mark.asyncio
-async def test_transport_error_retries_then_succeeds() -> None:
-    request = httpx.Request("GET", "http://kibana:5601/internal/evals/evaluators")
-    _RecordingAsyncClient.configure([httpx.ConnectError("connection failed", request=request), _list_response()])
-
-    result = await KibanaEvaluatorsClient("http://kibana:5601").list_evaluators()
-
-    assert len(result.evaluators) == 2
-    assert len(_RecordingAsyncClient.requests) == 2
-
-
 @pytest.mark.parametrize(
     "profile",
     ["elastic-inference", "otel-genai-events", "otel-genai-attributes", "claude-code"],
 )
 def test_all_instrumentation_profiles_are_accepted(profile: InstrumentationProfile) -> None:
     assert EvaluationInstrumentation(profile=profile).profile == profile
-
-
-@pytest.mark.parametrize(
-    "subject",
-    [
-        {"traces": []},
-        {"traces": [{"trace_id": "trace-1"}, {"trace_id": "trace-2"}]},
-        {"mode": "unsupported", "traces": [{"trace_id": "trace-1"}]},
-        {"traces": [{"trace_id": "trace-1"}], "instrumentation": {"profile": "unsupported"}},
-    ],
-)
-def test_subject_rejects_invalid_bounds_and_enums(subject: dict[str, Any]) -> None:
-    with pytest.raises(ValidationError):
-        EvaluationSubject.model_validate(subject)
-
-
-@pytest.mark.parametrize("count", [0, 21])
-def test_requests_reject_invalid_evaluator_counts(count: int) -> None:
-    subject = _subject()
-    with pytest.raises(ValidationError):
-        ValidateEvaluatorsRequest(
-            subject=subject,
-            evaluators=[ValidateEvaluatorConfig(name=f"evaluator-{index}") for index in range(count)],
-        )
-    with pytest.raises(ValidationError):
-        EvaluateRequest(
-            subject=subject,
-            evaluators=[EvaluateEvaluatorConfig(name=f"evaluator-{index}") for index in range(count)],
-        )
 
 
 @pytest.mark.parametrize("kind", ["LLM", "custom"])

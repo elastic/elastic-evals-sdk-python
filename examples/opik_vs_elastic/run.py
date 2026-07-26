@@ -302,7 +302,7 @@ async def main() -> None:
 
     # (9) Run experiment + evals:
     async def task(example: Example):
-        response = await agent_builder_task(example, config)
+        response = await agent_builder_task(example, config, agent_id=agent.id)
         params = EvaluatorParams(
             input=example.input,
             output=response,
