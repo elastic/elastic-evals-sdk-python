@@ -9,7 +9,6 @@ import os
 from typing import Any
 
 import httpx
-import pandas as pd
 from dotenv import load_dotenv
 
 from elastic_evals.agent_builder import (
@@ -46,6 +45,7 @@ from elastic_evals.types import (
     EvaluatorParams,
     Example,
 )
+from examples.opik_vs_elastic.helpers.data import load_wix_data, select_qa_examples
 from examples.opik_vs_elastic.helpers.helpers import (
     AGENT_ID,
     AGENT_INSTRUCTIONS,
@@ -55,13 +55,17 @@ from examples.opik_vs_elastic.helpers.helpers import (
     INDEX_NAME,
     SEARCH_TOOL_DESCRIPTION,
     SEARCH_TOOL_ID,
-    WIX_KNOWLEDGE_BASE_PATH,
-    WIX_QA_DATASET_PATH,
     _extract_retrieved_doc_ids,  # noqa: PLC2701
-    _parse_relevant_doc_ids,  # noqa: PLC2701
     _to_string_list,  # noqa: PLC2701
 )
 from examples.opik_vs_elastic.helpers.indexing import get_elasticsearch_client
+
+USE_ENTIRE_DATASET = False
+DATASET_SAMPLE_SIZE = 10
+USE_GCP = False
+
+DATASET_NAME = "wix_qa_managed_workflow"
+DATASET_DESCRIPTION = "WixQA golden Q&A pairs for the managed evaluation workflow."
 
 WIX_RESPONSE_CRITERIA = [
     "The response directly addresses the user's Wix support question.",
@@ -152,16 +156,15 @@ async def main() -> None:
     load_dotenv(ENV_PATH)
 
     # (1) Prepare data:
-    print("\nLoading QA pairs from GCS (wix_qa dataset)...")
-    qa_wix = pd.read_csv(WIX_QA_DATASET_PATH)
-    qa_wix["relevant_doc_ids"] = qa_wix[GROUND_TRUTH_COLUMN].apply(_parse_relevant_doc_ids)
-    print(f"Dataset shape: {qa_wix.shape}")  # output: (52, 5)
-    # print(qa_wix.head())
-
-    print("\nLoading knowledge base from GCS (wix_knowledge_base dataset)...")
-    kb_wix = pd.read_csv(WIX_KNOWLEDGE_BASE_PATH)
-    print(f"Dataset shape: {kb_wix.shape}")  # output: (6222, 4)
-    # print(kb_wix.head())
+    source = "GCS" if USE_GCP else "Hugging Face"
+    print(f"\nLoading WixQA data from {source}...")
+    all_qa_wix, kb_wix = load_wix_data(use_gcp=USE_GCP)
+    qa_wix = select_qa_examples(
+        all_qa_wix,
+        use_entire_dataset=USE_ENTIRE_DATASET,
+        sample_size=DATASET_SAMPLE_SIZE,
+    )
+    print(f"Selected {len(qa_wix)} of {len(all_qa_wix)} QA examples; knowledge base contains {len(kb_wix)} documents")
 
     # (2) Indexing the knowledge base into elasticsearch (if not indexed already):
     print("Indexing knowledge base into Elasticsearch...")
@@ -200,8 +203,8 @@ async def main() -> None:
     ]
 
     examples_dataset = EvaluationDataset(
-        name="wix_qa_smoke",
-        description="Small sample of WixQA golden Q&A pairs for smoke-testing the pipeline.",
+        name=DATASET_NAME,
+        description=DATASET_DESCRIPTION,
         examples=[
             Example(
                 input={"question": row["input_question"]},
@@ -213,8 +216,7 @@ async def main() -> None:
                 },
             )
             for _, row in qa_wix.iterrows()
-            if _ < 10
-        ],  # take only the first 10 examples for a quick iteration
+        ],
     )
 
     # [IMPORTANT] NOTE: if the dataset doesn't exist, then it creates a new one with the given name. If the dataset already exists,
@@ -223,8 +225,8 @@ async def main() -> None:
     # UpsertDatasetResponse(dataset_id='0b5ee7b6-9f4a-5c66-b196-6b8cc5154eec', added=0, removed=47, unchanged=5)
 
     upsert_dataset_response = await elastic_evals_client._datasets_client.upsert(
-        name="wix_qa_smoke",
-        description="Small sample of WixQA golden Q&A pairs for smoke-testing the pipeline.",
+        name=DATASET_NAME,
+        description=DATASET_DESCRIPTION,
         examples=examples,
     )
     print(

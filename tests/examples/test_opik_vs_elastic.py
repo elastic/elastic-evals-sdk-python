@@ -27,6 +27,7 @@ from elastic_evals.types import (  # noqa: E402
 )
 from examples.opik_vs_elastic import run as opik_vs_elastic_run  # noqa: E402
 from examples.opik_vs_elastic import run2 as granular_run  # noqa: E402
+from examples.opik_vs_elastic.helpers.helpers import _parse_relevant_doc_ids  # noqa: E402, PLC2701
 
 TOOL_ID = "wix-knowledge-search"
 
@@ -55,14 +56,14 @@ def _tool_step(*document_ids: str, tool_id: str = TOOL_ID) -> dict:
 
 
 def test_parse_relevant_doc_ids() -> None:
-    assert opik_vs_elastic_run._parse_relevant_doc_ids("{'doc-1': 1, 'doc-2': 0, 'doc-3': True}") == [
+    assert _parse_relevant_doc_ids("{'doc-1': 1, 'doc-2': 0, 'doc-3': True}") == [
         "doc-1",
         "doc-3",
     ]
-    assert opik_vs_elastic_run._parse_relevant_doc_ids(None) == []
+    assert _parse_relevant_doc_ids(None) == []
 
     with pytest.raises(ValueError, match="must be a dictionary"):
-        opik_vs_elastic_run._parse_relevant_doc_ids("not a dictionary")
+        _parse_relevant_doc_ids("not a dictionary")
 
 
 @pytest.mark.asyncio

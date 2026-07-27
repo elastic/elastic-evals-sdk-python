@@ -13,7 +13,6 @@ from collections.abc import Iterable, Mapping
 from typing import Any, cast
 
 import httpx
-import pandas as pd
 from dotenv import load_dotenv
 from orca.evaluation.evaluators.retrieval import F1AtK, PrecisionAtK, RecallAtK  # type: ignore[import-untyped]
 from orca.evaluation.evidence.types import EvaluationEvidence, EvidenceArtifact  # type: ignore[import-untyped]
@@ -51,6 +50,7 @@ from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.export import build_ingest_score_item, get_git_metadata
 from elastic_evals.tracing import init_tracing, with_evaluator_span, with_task_span
 from elastic_evals.types import EvaluationResult, EvaluationRun, Evaluator, EvaluatorParams, Example, RunData
+from examples.opik_vs_elastic.helpers.data import load_wix_data, select_qa_examples
 from examples.opik_vs_elastic.helpers.helpers import (
     AGENT_ID,
     AGENT_INSTRUCTIONS,
@@ -60,18 +60,18 @@ from examples.opik_vs_elastic.helpers.helpers import (
     INDEX_NAME,
     SEARCH_TOOL_DESCRIPTION,
     SEARCH_TOOL_ID,
-    WIX_KNOWLEDGE_BASE_PATH,
-    WIX_QA_DATASET_PATH,
     _extract_retrieved_doc_ids,  # noqa: PLC2701
-    _parse_relevant_doc_ids,  # noqa: PLC2701
     _to_string_list,  # noqa: PLC2701
 )
 from examples.opik_vs_elastic.helpers.indexing import get_elasticsearch_client
 
+USE_ENTIRE_DATASET = False
+DATASET_SAMPLE_SIZE = 10
+USE_GCP = False
+
 EXPERIMENT_NAME = "Wix QA - granular Evaluators and Scores API workflow"
-DATASET_NAME = "wix_qa_granular_smoke"
-DATASET_DESCRIPTION = "Small Wix QA sample for the granular API workflow."
-EXAMPLE_LIMIT = 3
+DATASET_NAME = "wix_qa_granular_workflow"
+DATASET_DESCRIPTION = "WixQA golden Q&A pairs for the granular API workflow."
 TRACE_READY_ATTEMPTS = 10
 TRACE_READY_WAIT_SECONDS = 2.0
 KIBANA_EVALUATOR_NAMES = (
@@ -382,9 +382,17 @@ async def main() -> None:
     config = ElasticEvalsConfig.from_env()
     init_tracing(config.tracing)
 
-    qa_wix = pd.read_csv(WIX_QA_DATASET_PATH)
-    qa_wix["relevant_doc_ids"] = qa_wix[GROUND_TRUTH_COLUMN].apply(_parse_relevant_doc_ids)
-    kb_wix = pd.read_csv(WIX_KNOWLEDGE_BASE_PATH)
+    source = "GCS" if USE_GCP else "Hugging Face"
+    all_qa_wix, kb_wix = load_wix_data(use_gcp=USE_GCP)
+    qa_wix = select_qa_examples(
+        all_qa_wix,
+        use_entire_dataset=USE_ENTIRE_DATASET,
+        sample_size=DATASET_SAMPLE_SIZE,
+    )
+    print(
+        f"Loaded {source}: selected {len(qa_wix)} of {len(all_qa_wix)} QA examples; "
+        f"knowledge base contains {len(kb_wix)} documents"
+    )
     es_client = get_elasticsearch_client()
     es_client.create_index(INDEX_NAME, mappings=None, recreate=True)
     records = cast(Iterable[Mapping[str, Any]], kb_wix.to_dict(orient="records"))
@@ -415,7 +423,7 @@ async def main() -> None:
                 "meta_query_id": str(row["meta_query_id"]),
             },
         )
-        for _, row in qa_wix.head(EXAMPLE_LIMIT).iterrows()
+        for _, row in qa_wix.iterrows()
     ]
     upserted = await datasets_client.upsert(
         DATASET_NAME,

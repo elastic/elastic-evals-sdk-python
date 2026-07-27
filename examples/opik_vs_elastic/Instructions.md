@@ -1,35 +1,26 @@
 # Instructions
 
-Setup and run the Opik vs elastic-evals-sdk-python PoC.
+This PoC demonstrates how Agent Builder can use the `kbn/evals` Python SDK for dataset
+management, experiment tracing, and evaluator score ingestion—capabilities previously
+handled through Opik—and how to build custom evaluators.
 
-## 1. Python environment
+## 1. Dependencies
 
-From the SDK repo root:
-
-```bash
-cd elastic-evals-sdk-python
-uv sync --extra dev --extra runner --extra poc
-source .venv/bin/activate
-```
-
-## 2. Dependencies
-
-```bash
-uv add --optional poc datasets pandas python-dotenv ipykernel elasticsearch opik loguru
-uv sync --extra poc
-```
-
-Orca must be importable. Clone the `orca` repo as a sibling of `elastic-evals-sdk-python/` so the layout is:
+`run2.py` uses external Orca evaluators. Clone the `orca` repo as a sibling of
+`elastic-evals-sdk-python/` so the layout is:
 
 ```
 ── elastic-evals-sdk-python/
 ── orca/
 ```
 
-Then install it editable and register it under the `poc` extra:
+## 2. Python environment
+
+From the SDK repo root:
 
 ```bash
-uv add --optional poc --editable ../orca
+uv sync --group dev --extra runner --extra poc
+source .venv/bin/activate
 ```
 
 Register the venv as a Jupyter kernel. Only needed if your notebook/IDE doesn't pick up `.venv` automatically:
@@ -40,21 +31,50 @@ uv run python -m ipykernel install --user --name elastic-evals-poc
 
 ## 3. Secrets
 
-Retrieve the API keys (Opik, OpenRouter, HuggingFace) from Vault, then fill them into `.env`:
+Create `.env` next to `.env.example`:
+
+```bash
+cp examples/opik_vs_elastic/.env.example examples/opik_vs_elastic/.env
+```
+
+Set the local URLs, `ELASTICSEARCH_API_KEY`, `KIBANA_API_KEY`, `CONNECTOR_ID`,
+and `EVALUATION_CONNECTOR_ID`. The Opik variables are used when `run2.py` runs
+the tracked external Orca evaluators. Retrieve internal credentials from Vault
+when needed:
 
 ```bash
 VAULT_ADDR=https://secrets.elastic.co:8200 vault login --method oidc
 ```
 
-## 4. GCP access
+The public Hugging Face dataset does not require an API key.
 
-Only needed if you import data from a GCP bucket (e.g. `gs://agent-builder-data-science-datasets/...`). Authenticate with your `@elastic.co` account:
+## 4. Data source and sample size
+
+Set these values near the top of the script before running it:
+
+```python
+USE_ENTIRE_DATASET = False
+DATASET_SAMPLE_SIZE = 10
+USE_GCP = False
+```
+
+With `USE_GCP = False`, the scripts load the public `Wix/WixQA` dataset and
+knowledge base from Hugging Face. Set `USE_GCP = True` to use the internal GCS
+files. `DATASET_SAMPLE_SIZE` is ignored when `USE_ENTIRE_DATASET` is `True`.
+The entire knowledge base is always indexed.
+
+The available examples and their order may differ between Hugging Face and GCS.
+`run.py` defaults to 10 examples and `run2.py` defaults to 3.
+
+## 5. GCP access
+
+Only needed when `USE_GCP = True`. Authenticate with your `@elastic.co` account:
 
 ```bash
 gcloud auth application-default login
 ```
 
-## 5. Local stack
+## 6. Local stack
 
 Use a separate terminal for each service and leave it running.
 
@@ -128,25 +148,40 @@ curl --silent --show-error \
   http://localhost:5601/dev/api/status
 ```
 
-## 6. Elasticsearch API key
+## 7. Elasticsearch API key
 
-`run.py` authenticates to Elasticsearch with `ELASTICSEARCH_API_KEY` (and reuses the
-same key for Kibana, which validates Elasticsearch API keys). Create one against your
-cluster and paste the `encoded` field into `ELASTICSEARCH_API_KEY` in `.env`:
+Both scripts authenticate to Elasticsearch and Kibana. Create an API key against
+the local cluster and paste the `encoded` field into both
+`ELASTICSEARCH_API_KEY` and `KIBANA_API_KEY` in `.env`:
 
 ```bash
 curl -u elastic:changeme -XPOST http://localhost:9200/_security/api_key \
   -H 'Content-Type: application/json' -d '{"name":"evals-poc"}'
 ```
 
-This step is **optional** — skip it if you already have a valid `ELASTICSEARCH_API_KEY`
-for the cluster in `ES_URL`. It's required when the key is missing or invalid, e.g.
-after starting a fresh local Elasticsearch (`yarn es snapshot`): API keys are
-cluster-specific, so a key from a previous cluster returns `401`.
+This step is optional if both variables already contain a valid key for the
+current cluster. API keys are cluster-specific, so a key from a previous local
+Elasticsearch snapshot returns `401`.
 
-## 7. Run the PoC
+## 8. Run the PoC
+
+### `run.py`: managed workflow
+
+Demonstrates the higher-level workflow. It uses
+`ElasticEvalsClient.run_experiment()` to execute the selected WixQA examples,
+run SDK-side and custom evaluators, and ingest their scores.
 
 ```bash
 cd /Users/mafaldasavelho/Documents/work-repos/kibana-fork/evals-python-sdk/elastic-evals-sdk-python
 uv run --extra poc python examples/opik_vs_elastic/run.py
+```
+
+### `run2.py`: granular workflow
+
+Demonstrates the lower-level workflow without `run_experiment()`. It directly
+coordinates the Dataset, Evaluators, and Score Ingestion APIs, runs the custom
+Document Recall evaluator, and attaches external Orca scores.
+
+```bash
+uv run --extra poc python examples/opik_vs_elastic/run2.py
 ```
