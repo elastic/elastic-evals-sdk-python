@@ -38,7 +38,6 @@ from elastic_evals.evaluators.latency import create_latency_evaluator
 from elastic_evals.evaluators.output_tokens import create_output_tokens_evaluator
 from elastic_evals.evaluators.tool_calls import create_tool_calls_evaluator
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.indexing import get_elasticsearch_client
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import (
     EvaluationDataset,
@@ -62,6 +61,7 @@ from examples.opik_vs_elastic.helpers.helpers import (
     _parse_relevant_doc_ids,  # noqa: PLC2701
     _to_string_list,  # noqa: PLC2701
 )
+from examples.opik_vs_elastic.helpers.indexing import get_elasticsearch_client
 
 WIX_RESPONSE_CRITERIA = [
     "The response directly addresses the user's Wix support question.",
@@ -110,14 +110,17 @@ async def agent_builder_task(
 ) -> dict[str, Any]:
     """Call Agent Builder API and return response."""
 
+    request_body: dict[str, Any] = {
+        "connector_id": config.connector_id,
+        "input": example.input.get("question"),
+    }
+    if agent_id is not None:
+        request_body["agent_id"] = agent_id
+
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
             f"{config.kibana_url}/api/agent_builder/converse",
-            json={
-                "connector_id": config.connector_id,
-                "agent_id": config.agent_id if agent_id is None else agent_id,
-                "input": example.input.get("question"),
-            },
+            json=request_body,
             headers=build_agent_builder_headers(config.kibana_api_key),
         )
 
@@ -272,9 +275,6 @@ async def main() -> None:
 
     print(f"Agent ready: {agent.id} (tool: {tool.id} -> index: {INDEX_NAME})")
     print(f"Agent created — verify in UI: {os.environ['KIBANA_URL']}/app/agent_builder/manage/agents/{agent.id}")
-
-    # NOTE: if an agent is created during the script, the configs can be updated on the running to avoid using the default AgentBuilder:
-    # config.agent_id = agent.id  # set the agent_id in the config for later use in the task function
 
     # (7) Create built-in evaluators:
     correctness_analysis = create_correctness_analysis_evaluator(inference_client=inference_client, log=log)

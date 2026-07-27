@@ -63,8 +63,6 @@ class ElasticEvalsConfig(BaseModel):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     model: dict[str, Any] | None = None
 
-    agent_id: str | None = None  # Optional agent ID for Agent Builder evaluations
-
     @property
     def logger(self) -> logging.Logger:
         return setup_logging(self.log_level)
@@ -108,8 +106,6 @@ class ElasticEvalsConfig(BaseModel):
             run_id=run_id,
         )
 
-        agent_id = os.environ.get("AGENT_ID", None)
-
         return cls(
             run_id=run_id,
             repetitions=repetitions,
@@ -124,7 +120,6 @@ class ElasticEvalsConfig(BaseModel):
             tracing=tracing,
             log_level=cast(Literal["DEBUG", "INFO", "WARNING", "ERROR"], log_level),
             model=model,
-            agent_id=agent_id,  
         )
 
     @field_validator("concurrency")

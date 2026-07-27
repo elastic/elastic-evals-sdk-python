@@ -49,7 +49,6 @@ from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.export import build_ingest_score_item, get_git_metadata
-from elastic_evals.indexing import get_elasticsearch_client
 from elastic_evals.tracing import init_tracing, with_evaluator_span, with_task_span
 from elastic_evals.types import EvaluationResult, EvaluationRun, Evaluator, EvaluatorParams, Example, RunData
 from examples.opik_vs_elastic.helpers.helpers import (
@@ -67,6 +66,7 @@ from examples.opik_vs_elastic.helpers.helpers import (
     _parse_relevant_doc_ids,  # noqa: PLC2701
     _to_string_list,  # noqa: PLC2701
 )
+from examples.opik_vs_elastic.helpers.indexing import get_elasticsearch_client
 
 EXPERIMENT_NAME = "Wix QA - granular Evaluators and Scores API workflow"
 DATASET_NAME = "wix_qa_granular_smoke"
@@ -125,14 +125,17 @@ async def agent_builder_task(
 ) -> dict[str, Any]:
     """Call Agent Builder API and return response."""
 
+    request_body: dict[str, Any] = {
+        "connector_id": config.connector_id,
+        "input": example.input.get("question"),
+    }
+    if agent_id is not None:
+        request_body["agent_id"] = agent_id
+
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
             f"{config.kibana_url}/api/agent_builder/converse",
-            json={
-                "connector_id": config.connector_id,
-                "agent_id": config.agent_id if agent_id is None else agent_id,
-                "input": example.input.get("question"),
-            },
+            json=request_body,
             headers=build_agent_builder_headers(config.kibana_api_key),
         )
 
