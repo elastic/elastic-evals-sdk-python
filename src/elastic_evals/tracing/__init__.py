@@ -4,6 +4,7 @@
 
 """Tracing utilities for elastic-evals."""
 
+from .client import ElasticsearchTraceClient, EsqlColumn, EsqlResponse
 from .config import TracingConfig, init_tracing
 from .spans import (
     get_current_trace_id,
@@ -13,6 +14,9 @@ from .spans import (
 )
 
 __all__ = [
+    "ElasticsearchTraceClient",
+    "EsqlColumn",
+    "EsqlResponse",
     "TracingConfig",
     "get_current_trace_id",
     "init_tracing",
