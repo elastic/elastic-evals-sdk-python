@@ -24,10 +24,10 @@ runner = ["click>=8.4.2"]
 poc = [
     "datasets>=5.0.0",
     "elasticsearch>=9.3.0",
+    "gcsfs>=2026.3.0",
     "ipykernel>=7.3.0",
     "loguru>=0.7.3",
     "opik>=2.1.32",
-    "orca",
     "pandas>=3.0.3",
     "python-dotenv>=1.2.2",
 ]
@@ -91,6 +91,3 @@ known-first-party = ["elastic_evals"]
 
 [tool.uv]
 environments = ["python_version >= '3.12'"]
-
-[tool.uv.sources]
-orca = { path = "../orca", editable = true }

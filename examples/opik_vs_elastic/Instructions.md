@@ -21,12 +21,13 @@ From the SDK repo root:
 ```bash
 uv sync --group dev --extra runner --extra poc
 source .venv/bin/activate
+uv pip install --editable ../orca
 ```
 
 Register the venv as a Jupyter kernel. Only needed if your notebook/IDE doesn't pick up `.venv` automatically:
 
 ```bash
-uv run python -m ipykernel install --user --name elastic-evals-poc
+uv run --no-sync python -m ipykernel install --user --name elastic-evals-poc
 ```
 
 ## 3. Secrets
@@ -173,7 +174,7 @@ run SDK-side and custom evaluators, and ingest their scores.
 
 ```bash
 cd /Users/mafaldasavelho/Documents/work-repos/kibana-fork/evals-python-sdk/elastic-evals-sdk-python
-uv run --extra poc python examples/opik_vs_elastic/run.py
+uv run --no-sync python examples/opik_vs_elastic/run.py
 ```
 
 ### `run2.py`: granular workflow
@@ -183,5 +184,5 @@ coordinates the Dataset, Evaluators, and Score Ingestion APIs, runs the custom
 Document Recall evaluator, and attaches external Orca scores.
 
 ```bash
-uv run --extra poc python examples/opik_vs_elastic/run2.py
+uv run --no-sync python examples/opik_vs_elastic/run2.py
 ```
