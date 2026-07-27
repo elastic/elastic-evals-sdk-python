@@ -88,6 +88,3 @@ min-file-size = 2
 
 [tool.ruff.lint.isort]
 known-first-party = ["elastic_evals"]
-
-[tool.uv]
-environments = ["python_version >= '3.12'"]
