@@ -63,6 +63,7 @@ class EvaluatorParams(Generic[TInput, TExpected, TMetadata, TTaskOutput]):
     output: TTaskOutput
     expected: TExpected | None
     metadata: TMetadata
+    trace_id: str | None = None
 
 
 class Evaluator(Protocol, Generic[TInput, TExpected, TMetadata, TTaskOutput]):

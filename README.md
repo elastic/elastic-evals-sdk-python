@@ -166,6 +166,103 @@ The SDK no longer writes score documents directly to Elasticsearch.
 **This sync is destructive**: examples missing from a later run's dataset payload are deleted
 from Kibana dataset storage.
 
+## Evaluators API
+
+`KibanaEvaluatorsClient` exposes the four raw Kibana evaluator endpoints: list evaluators,
+resolve trace instrumentation, validate evaluator evidence, and evaluate a trace. It returns
+per-evaluator errors from a successful evaluation as typed result items rather than raising them.
+
+The following manual smoke test requires an indexed trace and a Kibana connector. The API key
+needs `read_evals` for listing and `manage_evals` for the other operations.
+
+```python
+import asyncio
+import os
+
+from elastic_evals.api import (
+    EvaluateEvaluatorConfig,
+    EvaluateRequest,
+    EvaluationInstrumentation,
+    EvaluationSubject,
+    EvaluationTrace,
+    KibanaEvaluatorsClient,
+    ValidateEvaluatorConfig,
+    ValidateEvaluatorsRequest,
+)
+
+
+async def main() -> None:
+    trace_id = os.environ["TRACE_ID"]
+    connector_id = os.environ["EVALUATION_CONNECTOR_ID"]
+    client = KibanaEvaluatorsClient(
+        os.environ.get("KIBANA_URL", "http://localhost:5601"),
+        api_key=os.environ.get("KIBANA_API_KEY"),
+    )
+
+    available = await client.list_evaluators()
+    names = {evaluator.name for evaluator in available.evaluators}
+    expected_names = {
+        "groundedness",
+        "correctness",
+        "latency",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls",
+    }
+    print("evaluators:", sorted(names))
+    assert expected_names <= names
+
+    resolved = await client.resolve_instrumentation(trace_id)
+    if resolved.recommended_instrumentation is None:
+        raise RuntimeError("No instrumentation profile found for this trace")
+    profile = resolved.recommended_instrumentation.profile
+    print("instrumentation:", profile)
+
+    subject = EvaluationSubject(
+        traces=[
+            EvaluationTrace(
+                trace_id=trace_id,
+                reference_data={"expected": "The expected answer for this trace"},
+            )
+        ],
+        instrumentation=EvaluationInstrumentation(profile=profile),
+    )
+    validation = await client.validate(
+        ValidateEvaluatorsRequest(
+            subject=subject,
+            evaluators=[
+                ValidateEvaluatorConfig(name="latency"),
+                ValidateEvaluatorConfig(name="correctness"),
+            ],
+        )
+    )
+    for evaluator in validation.evaluators:
+        print("validation:", evaluator.name, evaluator.ready, evaluator.unmet)
+
+    evaluation = await client.evaluate(
+        EvaluateRequest(
+            subject=subject,
+            evaluators=[
+                EvaluateEvaluatorConfig(name="latency"),
+                EvaluateEvaluatorConfig(name="correctness", connector_id=connector_id),
+            ],
+        )
+    )
+    for result in evaluation.results:
+        if result.status == "ok":
+            for score in result.scores or []:
+                print("score:", result.evaluator.name, score.name, score.score, score.label)
+        else:
+            print("error:", result.evaluator.name, result.error)
+
+
+asyncio.run(main())
+```
+
+Correctness returns three sub-scores: `factuality`, `relevance`, and `sequence_accuracy`.
+The client retries transient failures, so an ambiguous `_evaluate` failure can repeat LLM
+inference work and cost.
+
 ## CLI
 
 ```bash

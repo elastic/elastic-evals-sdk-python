@@ -6,12 +6,10 @@
 
 from __future__ import annotations
 
-import json
 import uuid
-from typing import Any, NoReturn
+from typing import NoReturn
 
 import httpx
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from elastic_evals.api.constants import (
     DATASET_UUID_NAMESPACE,
@@ -25,20 +23,8 @@ from elastic_evals.api.datasets_models import (
 )
 from elastic_evals.api.errors import DatasetSyncError
 from elastic_evals.api.headers import build_kibana_headers
-
-
-def _is_retryable_status_code(status_code: int) -> bool:
-    return status_code in {408, 429} or status_code >= 500
-
-
-def _is_retryable_error(error: BaseException) -> bool:
-    if isinstance(error, httpx.HTTPStatusError):
-        return _is_retryable_status_code(error.response.status_code)
-    if isinstance(error, httpx.HTTPError):
-        return True
-    if isinstance(error, DatasetSyncError):
-        return error.retryable
-    return False
+from elastic_evals.api.response import parse_error_body
+from elastic_evals.api.retry import is_retryable_status_code, retry_kibana_api_call
 
 
 def compute_dataset_id(name: str) -> str:
@@ -57,12 +43,7 @@ class KibanaDatasetsClient:
         self.api_key = api_key
         self.timeout = timeout
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception(_is_retryable_error),
-    )
+    @retry_kibana_api_call
     async def upsert(
         self,
         name: str,
@@ -86,12 +67,7 @@ class KibanaDatasetsClient:
 
         self._raise_dataset_sync_error(response)
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception(_is_retryable_error),
-    )
+    @retry_kibana_api_call
     async def get(self, dataset_id: str) -> GetDatasetResponse:
         url = f"{self.kibana_url}{EVALS_DATASET_URL.format(dataset_id=dataset_id)}"
         headers = build_kibana_headers(self.api_key)
@@ -113,13 +89,7 @@ class KibanaDatasetsClient:
 
     def _raise_dataset_sync_error(self, response: httpx.Response) -> NoReturn:
         status_code = response.status_code
-        body: Any
-        try:
-            body = response.json()
-            body_text = json.dumps(body, ensure_ascii=True)
-        except (ValueError, json.JSONDecodeError):
-            body = response.text
-            body_text = response.text
+        body, body_text = parse_error_body(response)
 
         message = f"Kibana dataset sync request failed with {status_code}"
         if body_text:
@@ -129,5 +99,5 @@ class KibanaDatasetsClient:
             message=message,
             status_code=status_code,
             body=body,
-            retryable=_is_retryable_status_code(status_code),
+            retryable=is_retryable_status_code(status_code),
         )
