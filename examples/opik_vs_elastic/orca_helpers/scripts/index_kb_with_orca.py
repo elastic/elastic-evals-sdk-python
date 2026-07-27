@@ -1,3 +1,7 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 """Index the Wix knowledge base into Elasticsearch using orca_helpers's real pipeline.
 
 This mirrors orca_helpers's own ``orca_helpers.etl.indexing.cli`` so it runs the exact code the
@@ -40,10 +44,7 @@ def main() -> int:
 
     es_client = get_elasticsearch_client()
     if es_client is None:
-        raise RuntimeError(
-            "Could not connect to Elasticsearch. Set CLOUD_ID + ELASTICSEARCH_API_KEY "
-            "or ES_HOST."
-        )
+        raise RuntimeError("Could not connect to Elasticsearch. Set CLOUD_ID + ELASTICSEARCH_API_KEY or ES_HOST.")
 
     indexing_config = IndexingConfig(gcs_root=GCS_ROOT, recreate_indices=True)
 

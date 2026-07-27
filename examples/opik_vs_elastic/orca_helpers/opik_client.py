@@ -1,3 +1,7 @@
+# Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+# or more contributor license agreements. Licensed under the Elastic License 2.0;
+# you may not use this file except in compliance with the Elastic License 2.0.
+
 """Opik dataset client, mirroring and extending orca_helpers's opik_client.py.
 
 orca_helpers's ``clients/opik_client.py`` only wraps ``get_dataset`` and
@@ -62,9 +66,7 @@ class OpikDatasetsClient:
         Falls back to the client's default project when ``project_name`` is
         omitted.
         """
-        return self._sdk_client.get_datasets(
-            max_results=max_results, project_name=project_name
-        )
+        return self._sdk_client.get_datasets(max_results=max_results, project_name=project_name)
 
     def add_rows(
         self,
@@ -74,9 +76,7 @@ class OpikDatasetsClient:
         ignore_keys: list[str] | None = None,
     ) -> None:
         """Insert dataframe rows into a dataset, renaming/skipping columns."""
-        dataset.insert_from_pandas(
-            df, keys_mapping=keys_mapping, ignore_keys=ignore_keys
-        )
+        dataset.insert_from_pandas(df, keys_mapping=keys_mapping, ignore_keys=ignore_keys)
 
     def get_rows(
         self,
@@ -88,9 +88,7 @@ class OpikDatasetsClient:
 
     def dataset_url(self, dataset: Dataset) -> str:
         """Build a UI URL for viewing this dataset in Opik."""
-        return url_helpers.get_dataset_url_by_id(
-            dataset_id=dataset.id, url_override=OpikConfig().url_override
-        )
+        return url_helpers.get_dataset_url_by_id(dataset_id=dataset.id, url_override=OpikConfig().url_override)
 
     def project_url(self, project_name: str | None = None) -> str:
         """Build a UI URL for viewing a project in Opik."""

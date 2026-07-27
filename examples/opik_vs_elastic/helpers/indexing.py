@@ -78,11 +78,7 @@ def get_elasticsearch_client() -> ElasticsearchClient:
     """Build a client from CLOUD_ID/ELASTICSEARCH_API_KEY or ES_URL/ES_HOST env vars."""
     cloud_id = os.getenv("CLOUD_ID")
     api_key = os.getenv("ELASTICSEARCH_API_KEY")
-    host = (
-        os.getenv("ES_URL")
-        or os.getenv("ELASTICSEARCH_ENDPOINT")
-        or os.getenv("ES_HOST")
-    )
+    host = os.getenv("ES_URL") or os.getenv("ELASTICSEARCH_ENDPOINT") or os.getenv("ES_HOST")
 
     if cloud_id and api_key:
         es = Elasticsearch(cloud_id=cloud_id, api_key=api_key)
@@ -91,8 +87,6 @@ def get_elasticsearch_client() -> ElasticsearchClient:
     elif host:
         es = Elasticsearch(hosts=[host])
     else:
-        raise ValueError(
-            "Set CLOUD_ID + ELASTICSEARCH_API_KEY, or ES_URL/ES_HOST, to connect to Elasticsearch."
-        )
+        raise ValueError("Set CLOUD_ID + ELASTICSEARCH_API_KEY, or ES_URL/ES_HOST, to connect to Elasticsearch.")
 
     return ElasticsearchClient(es=es)
