@@ -6,11 +6,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, NoReturn
 
 import httpx
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from elastic_evals.agent_builder.constants import (
     AGENT_URL,
@@ -31,23 +29,11 @@ from elastic_evals.agent_builder.models import (
     UpdateAgentRequest,
     UpdateToolRequest,
 )
+from elastic_evals.api.response import parse_error_body
+from elastic_evals.api.retry import is_retryable_status_code, retry_kibana_api_call
 from elastic_evals.utils.logging import log
 
 logger = log.getChild(__name__)
-
-
-def _is_retryable_status_code(status_code: int) -> bool:
-    return status_code in {408, 429} or status_code >= 500
-
-
-def _is_retryable_error(error: BaseException) -> bool:
-    if isinstance(error, httpx.HTTPStatusError):
-        return _is_retryable_status_code(error.response.status_code)
-    if isinstance(error, httpx.HTTPError):
-        return True
-    if isinstance(error, AgentBuilderError):
-        return error.retryable
-    return False
 
 
 def _is_already_exists(error: AgentBuilderError) -> bool:
@@ -97,12 +83,7 @@ class AgentBuilderClient:
         logger.info("Created Agent Builder tool '%s'", request.id)
         return created
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception(_is_retryable_error),
-    )
+    @retry_kibana_api_call
     async def _create_tool(self, request: CreateToolRequest) -> ToolResponse:
         url = f"{self.kibana_url}{TOOLS_URL}"
         headers = build_agent_builder_headers(self.api_key)
@@ -110,11 +91,14 @@ class AgentBuilderClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=request.model_dump(exclude_none=True), headers=headers)
 
-        if 200 <= response.status_code < 300:
-            return ToolResponse.model_validate(response.json())
+        if response.is_success:
+            return ToolResponse.model_validate(
+                self._parse_success_body(response, context=f"create tool '{request.id}'")
+            )
 
         self._raise_error(response, context=f"create tool '{request.id}'")
 
+    @retry_kibana_api_call
     async def get_tool(self, tool_id: str) -> ToolResponse | None:
         """Fetch a tool by id, or None if it does not exist."""
         url = f"{self.kibana_url}{TOOL_URL.format(tool_id=tool_id)}"
@@ -123,19 +107,14 @@ class AgentBuilderClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(url, headers=headers)
 
-        if response.status_code == 200:
-            return ToolResponse.model_validate(response.json())
         if response.status_code == 404:
             return None
+        if response.is_success:
+            return ToolResponse.model_validate(self._parse_success_body(response, context=f"get tool '{tool_id}'"))
 
         self._raise_error(response, context=f"get tool '{tool_id}'")
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception(_is_retryable_error),
-    )
+    @retry_kibana_api_call
     async def update_tool(
         self,
         tool_id: str,
@@ -148,8 +127,8 @@ class AgentBuilderClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.put(url, json=request.model_dump(exclude_none=True), headers=headers)
 
-        if response.status_code == 200:
-            return ToolResponse.model_validate(response.json())
+        if response.is_success:
+            return ToolResponse.model_validate(self._parse_success_body(response, context=f"update tool '{tool_id}'"))
 
         self._raise_error(response, context=f"update tool '{tool_id}'")
 
@@ -209,12 +188,7 @@ class AgentBuilderClient:
         logger.info("Created Agent Builder agent '%s'", request.id)
         return created
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception(_is_retryable_error),
-    )
+    @retry_kibana_api_call
     async def _create_agent(self, request: CreateAgentRequest) -> AgentResponse:
         url = f"{self.kibana_url}{AGENTS_URL}"
         headers = build_agent_builder_headers(self.api_key)
@@ -222,11 +196,14 @@ class AgentBuilderClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=request.model_dump(exclude_none=True), headers=headers)
 
-        if 200 <= response.status_code < 300:
-            return AgentResponse.model_validate(response.json())
+        if response.is_success:
+            return AgentResponse.model_validate(
+                self._parse_success_body(response, context=f"create agent '{request.id}'")
+            )
 
         self._raise_error(response, context=f"create agent '{request.id}'")
 
+    @retry_kibana_api_call
     async def get_agent(self, agent_id: str) -> AgentResponse | None:
         """Fetch an agent and its metadata by ID, or None if it does not exist."""
         url = f"{self.kibana_url}{AGENT_URL.format(agent_id=agent_id)}"
@@ -235,19 +212,14 @@ class AgentBuilderClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(url, headers=headers)
 
-        if response.status_code == 200:
-            return AgentResponse.model_validate(response.json())
-        if response.status_code == 404:
+        if response.status_code == 404 or response.status_code == 204:  # status codes for not found and no content
             return None
+        if response.is_success:
+            return AgentResponse.model_validate(self._parse_success_body(response, context=f"get agent '{agent_id}'"))
 
         self._raise_error(response, context=f"get agent '{agent_id}'")
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception(_is_retryable_error),
-    )
+    @retry_kibana_api_call
     async def update_agent(
         self,
         agent_id: str,
@@ -260,8 +232,10 @@ class AgentBuilderClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.put(url, json=request.model_dump(exclude_none=True), headers=headers)
 
-        if response.status_code == 200:
-            return AgentResponse.model_validate(response.json())
+        if response.is_success:
+            return AgentResponse.model_validate(
+                self._parse_success_body(response, context=f"update agent '{agent_id}'")
+            )
 
         self._raise_error(response, context=f"update agent '{agent_id}'")
 
@@ -290,12 +264,7 @@ class AgentBuilderClient:
             ),
         )
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception(_is_retryable_error),
-    )
+    @retry_kibana_api_call
     async def call_converse(
         self,
         input_text: str,
@@ -318,15 +287,23 @@ class AgentBuilderClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=request_body, headers=headers)
 
-        if response.status_code != 200:
+        if not response.is_success:
             self._raise_error(response, context="call converse")
 
-        payload = response.json()
+        payload = self._parse_success_body(response, context="call converse")
         response_payload = payload.get("response")
         if not isinstance(response_payload, dict):
+            logger.warning(
+                "Expected Agent Builder converse response to be a dict, got %s",
+                type(response_payload).__name__,
+            )
             response_payload = {}
         steps = payload.get("steps")
         if not isinstance(steps, list):
+            logger.warning(
+                "Expected Agent Builder converse steps to be a list, got %s",
+                type(steps).__name__,
+            )
             steps = []
 
         return ConverseResponse(
@@ -339,21 +316,28 @@ class AgentBuilderClient:
 
     def _raise_error(self, response: httpx.Response, *, context: str) -> NoReturn:
         status_code = response.status_code
-        body: Any
-        try:
-            body = response.json()
-            body_text = json.dumps(body, ensure_ascii=True)
-        except (ValueError, json.JSONDecodeError):
-            body = response.text
-            body_text = response.text
+        body, body_text = parse_error_body(response)
 
         message = f"Agent Builder request failed ({context}) with {status_code}"
         if body_text:
             message = f"{message}: {body_text}"
 
+        logger.error(message)
         raise AgentBuilderError(
             message=message,
             status_code=status_code,
             body=body,
-            retryable=_is_retryable_status_code(status_code),
+            retryable=is_retryable_status_code(status_code),
         )
+
+    def _parse_success_body(self, response: httpx.Response, *, context: str) -> Any:
+        try:
+            return response.json()
+        except ValueError as error:
+            logger.error(
+                "Agent Builder request succeeded (%s) with %s but returned an invalid response body: %s",
+                context,
+                response.status_code,
+                error,
+            )
+            raise

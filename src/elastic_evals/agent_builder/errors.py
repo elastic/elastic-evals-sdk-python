@@ -6,16 +6,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from elastic_evals.api.errors import KibanaAPIError
 
 
-@dataclass
-class AgentBuilderError(RuntimeError):
-    message: str
-    status_code: int | None = None
-    body: Any = None
-    retryable: bool = False
-
-    def __str__(self) -> str:
-        return self.message
+class AgentBuilderError(KibanaAPIError):
+    """Error raised by the Kibana Agent Builder API."""

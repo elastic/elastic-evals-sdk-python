@@ -7,18 +7,9 @@
 from __future__ import annotations
 
 from elastic_evals.agent_builder.constants import AGENT_BUILDER_API_VERSION
+from elastic_evals.api.headers import build_kibana_headers
 
 
 def build_agent_builder_headers(api_key: str | None) -> dict[str, str]:
     """Build Agent Builder public API headers with optional API-key auth."""
-    headers = {
-        "Content-Type": "application/json",
-        "kbn-xsrf": "true",
-        "elastic-api-version": AGENT_BUILDER_API_VERSION,
-        "x-elastic-internal-origin": "true",
-    }
-
-    if api_key:
-        headers["Authorization"] = f"ApiKey {api_key}"
-
-    return headers
+    return build_kibana_headers(api_key, api_version=AGENT_BUILDER_API_VERSION)

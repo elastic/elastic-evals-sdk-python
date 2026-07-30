@@ -11,8 +11,8 @@ def test_build_agent_builder_headers_without_api_key() -> None:
     assert headers == {
         "Content-Type": "application/json",
         "kbn-xsrf": "true",
-        "elastic-api-version": "2023-10-31",
         "x-elastic-internal-origin": "true",
+        "Elastic-Api-Version": "2023-10-31",
     }
 
 

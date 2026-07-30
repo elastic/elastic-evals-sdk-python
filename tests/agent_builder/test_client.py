@@ -25,6 +25,7 @@ from elastic_evals.agent_builder import (
     UpdateAgentRequest,
     UpdateToolRequest,
 )
+from elastic_evals.api.errors import KibanaAPIError
 
 
 class _RecordingAsyncClient:
@@ -82,6 +83,8 @@ def _mock_http_client(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(AgentBuilderClient._create_tool.retry, "wait", wait_none())
     monkeypatch.setattr(AgentBuilderClient._create_agent.retry, "wait", wait_none())
+    monkeypatch.setattr(AgentBuilderClient.get_tool.retry, "wait", wait_none())
+    monkeypatch.setattr(AgentBuilderClient.get_agent.retry, "wait", wait_none())
     monkeypatch.setattr(AgentBuilderClient.update_tool.retry, "wait", wait_none())
     monkeypatch.setattr(AgentBuilderClient.update_agent.retry, "wait", wait_none())
     monkeypatch.setattr(AgentBuilderClient.call_converse.retry, "wait", wait_none())
@@ -110,6 +113,10 @@ def _agent_request() -> CreateAgentRequest:
     )
 
 
+def test_agent_builder_error_is_kibana_api_error() -> None:
+    assert isinstance(AgentBuilderError("request failed"), KibanaAPIError)
+
+
 @pytest.mark.asyncio
 async def test_create_tool_creates_missing_tool(
     caplog: pytest.LogCaptureFixture,
@@ -118,7 +125,7 @@ async def test_create_tool_creates_missing_tool(
         [
             httpx.Response(404, json={"message": "not found"}),
             httpx.Response(
-                200,
+                201,
                 json={
                     "id": "search-documents",
                     "type": "index_search",
@@ -352,12 +359,24 @@ async def test_call_converse_forwards_agent_connector_and_conversation() -> None
 
 
 @pytest.mark.parametrize(
-    ("status_code", "retryable"),
-    [(401, False), (403, False), (429, True), (500, True)],
+    ("status_code", "retryable", "attempts"),
+    [
+        (401, False, 1),
+        (403, False, 1),
+        (429, True, 3),
+        (500, True, 3),
+    ],
 )
 @pytest.mark.asyncio
-async def test_get_tool_surfaces_http_errors(status_code: int, retryable: bool) -> None:
-    _RecordingAsyncClient.configure([httpx.Response(status_code, json={"message": "request failed"})])
+async def test_get_tool_surfaces_http_errors(
+    status_code: int,
+    retryable: bool,
+    attempts: int,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _RecordingAsyncClient.configure(
+        [httpx.Response(status_code, json={"message": "request failed"}) for _ in range(attempts)]
+    )
 
     with pytest.raises(AgentBuilderError) as exc_info:
         await AgentBuilderClient("http://kibana:5601").get_tool("search-documents")
@@ -365,7 +384,38 @@ async def test_get_tool_surfaces_http_errors(status_code: int, retryable: bool) 
     assert exc_info.value.status_code == status_code
     assert exc_info.value.body == {"message": "request failed"}
     assert exc_info.value.retryable is retryable
-    assert len(_RecordingAsyncClient.requests) == 1
+    assert len(_RecordingAsyncClient.requests) == attempts
+    assert (
+        f"Agent Builder request failed (get tool 'search-documents') with {status_code}: "
+        '{"message": "request failed"}'
+    ) in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_get_agent_retries_transient_error() -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(503, json={"message": "temporarily unavailable"}),
+            httpx.Response(
+                200,
+                json={
+                    "id": "document-agent",
+                    "type": "chat",
+                    "name": "Document agent",
+                    "configuration": {
+                        "instructions": "Use the search tool.",
+                        "tools": [{"tool_ids": ["search-documents"]}],
+                    },
+                },
+            ),
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").get_agent("document-agent")
+
+    assert result is not None
+    assert result.id == "document-agent"
+    assert len(_RecordingAsyncClient.requests) == 2
 
 
 @pytest.mark.asyncio
@@ -452,7 +502,7 @@ async def test_create_agent_creates_missing_agent() -> None:
         [
             httpx.Response(404, json={"message": "not found"}),
             httpx.Response(
-                200,
+                202,
                 json={
                     "id": "document-agent",
                     "type": "chat",
@@ -490,12 +540,23 @@ async def test_update_missing_agent_surfaces_not_found() -> None:
     assert len(_RecordingAsyncClient.requests) == 1
 
 
+@pytest.mark.parametrize(
+    ("status_code", "content"),
+    [(200, b"not-json"), (204, b"")],
+)
 @pytest.mark.asyncio
-async def test_get_tool_rejects_malformed_json_response() -> None:
-    _RecordingAsyncClient.configure([httpx.Response(200, content=b"not-json")])
+async def test_get_tool_logs_invalid_success_body(
+    status_code: int,
+    content: bytes,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _RecordingAsyncClient.configure([httpx.Response(status_code, content=content)])
 
     with pytest.raises(json.JSONDecodeError):
         await AgentBuilderClient("http://kibana:5601").get_tool("search-documents")
+
+    assert f"Agent Builder request succeeded (get tool 'search-documents') with {status_code}" in caplog.text
+    assert "returned an invalid response body" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -582,3 +643,26 @@ async def test_call_converse_maps_empty_response() -> None:
     result = await AgentBuilderClient("http://kibana:5601").call_converse("What is the answer?")
 
     assert result == ConverseResponse()
+
+
+@pytest.mark.asyncio
+async def test_call_converse_warns_about_unexpected_response_shapes(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _RecordingAsyncClient.configure(
+        [
+            httpx.Response(
+                200,
+                json={
+                    "response": "unexpected",
+                    "steps": {"type": "tool_call"},
+                },
+            )
+        ]
+    )
+
+    result = await AgentBuilderClient("http://kibana:5601").call_converse("What is the answer?")
+
+    assert result == ConverseResponse()
+    assert "Expected Agent Builder converse response to be a dict, got str" in caplog.text
+    assert "Expected Agent Builder converse steps to be a list, got dict" in caplog.text
