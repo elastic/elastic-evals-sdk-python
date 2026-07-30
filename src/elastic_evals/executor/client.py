@@ -29,7 +29,6 @@ from elastic_evals.export.documents import build_ingest_score_item
 from elastic_evals.export.git_metadata import get_git_metadata
 from elastic_evals.inference import KibanaInferenceClient
 from elastic_evals.tracing import (
-    ElasticsearchTraceClient,
     get_current_trace_id,
     with_evaluator_span,
     with_task_span,
@@ -76,7 +75,6 @@ class ElasticEvalsClient:
             kibana_url=self.config.kibana_url,
             api_key=self.config.kibana_api_key,
         )
-        self._trace_client: ElasticsearchTraceClient | None = None
 
     def get_inference_client(self) -> KibanaInferenceClient:
         if self._inference_client is None:
@@ -90,16 +88,6 @@ class ElasticEvalsClient:
 
     def get_evaluators_client(self) -> KibanaEvaluatorsClient:
         return self._evaluators_client
-
-    def get_trace_client(self) -> ElasticsearchTraceClient:
-        if self._trace_client is None:
-            if not self.config.elasticsearch_url:
-                raise ValueError("ELASTICSEARCH_URL is required for trace-based evaluators")
-            self._trace_client = ElasticsearchTraceClient(
-                elasticsearch_url=self.config.elasticsearch_url,
-                api_key=self.config.elasticsearch_api_key,
-            )
-        return self._trace_client
 
     async def run_experiment(
         self,
