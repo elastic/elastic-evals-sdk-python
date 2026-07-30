@@ -27,8 +27,8 @@ from elastic_evals.api.evaluators_models import (
     ValidateEvaluatorsResponse,
 )
 from elastic_evals.api.headers import build_kibana_headers
-from elastic_evals.api.response import parse_error_body
-from elastic_evals.api.retry import is_retryable_status_code, retry_kibana_api_call
+from elastic_evals.api.response import raise_kibana_error
+from elastic_evals.api.retry import retry_kibana_api_call
 
 
 class KibanaEvaluatorsClient:
@@ -95,15 +95,8 @@ class KibanaEvaluatorsClient:
         if response.status_code == 200:
             return response
 
-        status_code = response.status_code
-        body, body_text = parse_error_body(response)
-        message = f"Kibana evaluators request failed with {status_code}"
-        if body_text:
-            message = f"{message}: {body_text}"
-
-        raise KibanaEvaluatorsError(
-            message=message,
-            status_code=status_code,
-            body=body,
-            retryable=is_retryable_status_code(status_code),
+        raise_kibana_error(
+            response,
+            error_cls=KibanaEvaluatorsError,
+            context="Kibana evaluators request",
         )

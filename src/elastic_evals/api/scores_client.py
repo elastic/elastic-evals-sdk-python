@@ -11,8 +11,8 @@ import httpx
 from elastic_evals.api.constants import EVALS_SCORES_URL
 from elastic_evals.api.errors import IngestScoresError
 from elastic_evals.api.headers import build_kibana_headers
-from elastic_evals.api.response import parse_error_body
-from elastic_evals.api.retry import is_retryable_status_code, retry_kibana_api_call
+from elastic_evals.api.response import raise_kibana_error
+from elastic_evals.api.retry import retry_kibana_api_call
 from elastic_evals.api.scores_models import IngestScoresRequest, IngestScoresResponse
 from elastic_evals.utils.logging import log
 
@@ -54,16 +54,8 @@ class KibanaScoresClient:
                     )
             return parsed
 
-        status_code = response.status_code
-        body, body_text = parse_error_body(response)
-
-        message = f"Kibana score ingest request failed with {status_code}"
-        if body_text:
-            message = f"{message}: {body_text}"
-
-        raise IngestScoresError(
-            message=message,
-            status_code=status_code,
-            body=body,
-            retryable=is_retryable_status_code(status_code),
+        raise_kibana_error(
+            response,
+            error_cls=IngestScoresError,
+            context="Kibana score ingest request",
         )

@@ -29,8 +29,8 @@ from elastic_evals.agent_builder.models import (
     UpdateAgentRequest,
     UpdateToolRequest,
 )
-from elastic_evals.api.response import parse_error_body
-from elastic_evals.api.retry import is_retryable_status_code, retry_kibana_api_call
+from elastic_evals.api.response import raise_kibana_error
+from elastic_evals.api.retry import retry_kibana_api_call
 from elastic_evals.utils.logging import log
 
 logger = log.getChild(__name__)
@@ -315,19 +315,12 @@ class AgentBuilderClient:
         )
 
     def _raise_error(self, response: httpx.Response, *, context: str) -> NoReturn:
-        status_code = response.status_code
-        body, body_text = parse_error_body(response)
-
-        message = f"Agent Builder request failed ({context}) with {status_code}"
-        if body_text:
-            message = f"{message}: {body_text}"
-
-        logger.error(message)
-        raise AgentBuilderError(
-            message=message,
-            status_code=status_code,
-            body=body,
-            retryable=is_retryable_status_code(status_code),
+        raise_kibana_error(
+            response,
+            error_cls=AgentBuilderError,
+            context="Agent Builder request",
+            operation=context,
+            logger=logger,
         )
 
     def _parse_success_body(self, response: httpx.Response, *, context: str) -> Any:
