@@ -17,6 +17,7 @@ from elastic_evals.api import (
     Ci,
     Environment,
     KibanaDatasetsClient,
+    KibanaEvaluatorsClient,
     Model,
     RunMetadata,
     UpsertDatasetExamplePayload,
@@ -71,6 +72,10 @@ class ElasticEvalsClient:
             kibana_url=self.config.kibana_url,
             api_key=self.config.kibana_api_key,
         )
+        self._evaluators_client = KibanaEvaluatorsClient(
+            kibana_url=self.config.kibana_url,
+            api_key=self.config.kibana_api_key,
+        )
         self._trace_client: ElasticsearchTraceClient | None = None
 
     def get_inference_client(self) -> KibanaInferenceClient:
@@ -82,6 +87,9 @@ class ElasticEvalsClient:
                 api_key=self.config.kibana_api_key,
             )
         return self._inference_client
+
+    def get_evaluators_client(self) -> KibanaEvaluatorsClient:
+        return self._evaluators_client
 
     def get_trace_client(self) -> ElasticsearchTraceClient:
         if self._trace_client is None:

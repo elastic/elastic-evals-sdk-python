@@ -14,10 +14,8 @@ import pytest
 from elastic_evals.api import compute_dataset_id
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators import (
-    create_input_tokens_evaluator,
-    create_latency_evaluator,
-    create_output_tokens_evaluator,
-    create_tool_calls_evaluator,
+    KibanaEvaluatorConfig,
+    kibana_evaluators,
 )
 from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.executor import ElasticEvalsClient
@@ -70,7 +68,7 @@ def fake_kibana(
         "upsert": [],
         "get": [],
         "scores": [],
-        "trace_queries": [],
+        "evaluations": [],
     }
     dataset_id = compute_dataset_id("tiny")
 
@@ -127,21 +125,36 @@ def fake_kibana(
             requests["scores"].append({"url": url, "headers": headers, "body": body})
             return httpx.Response(status_code=200, json={"ingested": 1, "conflicted": 0, "failed": []})
 
-        if request.method == "POST" and url.endswith("/_query?format=json"):
+        if request.method == "POST" and url.endswith("/internal/evals/_evaluate"):
             body = json.loads(request.content.decode("utf-8"))
-            requests["trace_queries"].append({"url": url, "headers": headers, "body": body})
-            query = body["query"]
-            if "latency_seconds" in query:
-                column, value = "latency_seconds", 2.5
-            elif "input_tokens" in query:
-                column, value = "input_tokens", 123
-            elif "output_tokens" in query:
-                column, value = "output_tokens", 45
-            else:
-                column, value = "tool_calls", 3
+            requests["evaluations"].append({"url": url, "headers": headers, "body": body})
+            scores = {
+                "latency": 2.5,
+                "input_tokens": 123,
+                "output_tokens": 45,
+                "tool_calls": 3,
+            }
             return httpx.Response(
                 status_code=200,
-                json={"columns": [{"name": column, "type": "double"}], "values": [[value]]},
+                json={
+                    "results": [
+                        {
+                            "status": "ok",
+                            "evaluator": {
+                                "name": evaluator["name"],
+                                "version": "1.0.0",
+                                "kind": "code",
+                            },
+                            "scores": [
+                                {
+                                    "name": evaluator["name"],
+                                    "score": scores[evaluator["name"]],
+                                }
+                            ],
+                        }
+                        for evaluator in body["evaluators"]
+                    ]
+                },
             )
 
         return httpx.Response(status_code=404, json={"message": "unexpected request"})
@@ -156,7 +169,7 @@ def fake_kibana(
         _TransportBackedAsyncClient,
     )
     monkeypatch.setattr(
-        "elastic_evals.tracing.client.httpx.AsyncClient",
+        "elastic_evals.api.evaluators_client.httpx.AsyncClient",
         _TransportBackedAsyncClient,
     )
 
@@ -252,7 +265,7 @@ async def test_runner_end_to_end(
 
 
 @pytest.mark.asyncio
-async def test_runner_executes_registered_trace_metrics_from_elasticsearch(
+async def test_runner_executes_registered_trace_metrics_through_kibana(
     fake_kibana: dict[str, list[dict[str, Any]]],
 ) -> None:
     dataset = EvaluationDataset(
@@ -264,20 +277,21 @@ async def test_runner_executes_registered_trace_metrics_from_elasticsearch(
         run_id="trace-metrics-run",
         connector_id="test-connector",
         kibana_url="http://kibana:5601",
-        elasticsearch_url="http://elasticsearch:9200",
-        elasticsearch_api_key="trace-key",
+        kibana_api_key="secret-key",
         repetitions=1,
         concurrency=1,
         tracing=TracingConfig(enabled=False),
     )
     client = ElasticEvalsClient(config=config)
-    trace_client = client.get_trace_client()
-    evaluators = [
-        create_latency_evaluator(trace_client=trace_client, log=config.logger),
-        create_input_tokens_evaluator(trace_client=trace_client, log=config.logger),
-        create_output_tokens_evaluator(trace_client=trace_client, log=config.logger),
-        create_tool_calls_evaluator(trace_client=trace_client, log=config.logger),
-    ]
+    evaluators = kibana_evaluators(
+        [
+            KibanaEvaluatorConfig(name="latency", kind="CODE"),
+            KibanaEvaluatorConfig(name="input_tokens", kind="CODE"),
+            KibanaEvaluatorConfig(name="output_tokens", kind="CODE"),
+            KibanaEvaluatorConfig(name="tool_calls", kind="CODE"),
+        ],
+        client=client.get_evaluators_client(),
+    )
 
     async def task(example: Example) -> dict[str, str]:
         trace_id = "1" * 32 if example.input["q"].startswith("ONE") else "2" * 32
@@ -286,10 +300,21 @@ async def test_runner_executes_registered_trace_metrics_from_elasticsearch(
     result = await client.run_experiment(dataset=dataset, task=task, evaluators=evaluators)
 
     assert len(result.evaluation_runs) == 8
-    assert len(fake_kibana["trace_queries"]) == 8
+    assert len(fake_kibana["evaluations"]) == 2
     assert len(fake_kibana["scores"]) == 8
-    assert all(query["url"] == "http://elasticsearch:9200/_query?format=json" for query in fake_kibana["trace_queries"])
-    assert all(query["headers"]["authorization"] == "ApiKey trace-key" for query in fake_kibana["trace_queries"])
+    assert all(
+        request["url"] == "http://kibana:5601/internal/evals/_evaluate" for request in fake_kibana["evaluations"]
+    )
+    assert all(request["headers"]["authorization"] == "ApiKey secret-key" for request in fake_kibana["evaluations"])
+    assert {request["body"]["subject"]["traces"][0]["trace_id"] for request in fake_kibana["evaluations"]} == {
+        "1" * 32,
+        "2" * 32,
+    }
+    assert all(
+        [evaluator["name"] for evaluator in request["body"]["evaluators"]]
+        == ["latency", "input_tokens", "output_tokens", "tool_calls"]
+        for request in fake_kibana["evaluations"]
+    )
     assert {run.name for run in result.evaluation_runs} == {
         "latency",
         "input_tokens",
