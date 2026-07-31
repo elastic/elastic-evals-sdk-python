@@ -10,16 +10,16 @@ from typing import Any, NoReturn
 
 import httpx
 
-from elastic_evals.agent_builder.constants import (
+from elastic_evals._internal.agent_builder.constants import (
     AGENT_URL,
     AGENTS_URL,
     CONVERSE_URL,
     TOOL_URL,
     TOOLS_URL,
 )
-from elastic_evals.agent_builder.errors import AgentBuilderError
-from elastic_evals.agent_builder.headers import build_agent_builder_headers
-from elastic_evals.agent_builder.models import (
+from elastic_evals._internal.agent_builder.errors import AgentBuilderError
+from elastic_evals._internal.agent_builder.headers import build_agent_builder_headers
+from elastic_evals._internal.agent_builder.models import (
     AgentResponse,
     ConverseResponse,
     CreateAgentRequest,

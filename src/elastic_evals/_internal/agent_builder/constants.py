@@ -2,7 +2,7 @@
 # or more contributor license agreements. Licensed under the Elastic License 2.0;
 # you may not use this file except in compliance with the Elastic License 2.0.
 
-"""Constants for the Kibana Agent Builder public API."""
+"""Constants for the Kibana Agent Builder API."""
 
 from __future__ import annotations
 
