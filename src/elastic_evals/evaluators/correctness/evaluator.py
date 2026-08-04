@@ -94,7 +94,7 @@ def create_correctness_analysis_evaluator(
             metadata=result.metadata,
         )
 
-    return SimpleEvaluator(name="correctness", kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(name=QUALITATIVE_EVALUATOR_NAME, kind="LLM", evaluate=evaluate)
 
 
 def _analysis_explanation(summary: Any, fallback: str | None) -> str | None:

@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-from elastic_evals.integrations.agent_builder.constants import AGENT_BUILDER_API_VERSION
 from elastic_evals.api.headers import build_kibana_headers
+from elastic_evals.integrations.agent_builder.constants import AGENT_BUILDER_API_VERSION
 
 
 def build_agent_builder_headers(api_key: str | None) -> dict[str, str]:

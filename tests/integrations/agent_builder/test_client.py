@@ -13,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 from tenacity import wait_none
 
+from elastic_evals.api.errors import KibanaAPIError
 from elastic_evals.integrations.agent_builder import (
     AgentBuilderClient,
     AgentBuilderError,
@@ -25,7 +26,6 @@ from elastic_evals.integrations.agent_builder import (
     UpdateAgentRequest,
     UpdateToolRequest,
 )
-from elastic_evals.api.errors import KibanaAPIError
 
 
 class _RecordingAsyncClient:

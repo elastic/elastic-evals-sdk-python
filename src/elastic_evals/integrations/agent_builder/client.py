@@ -10,6 +10,8 @@ from typing import Any, NoReturn
 
 import httpx
 
+from elastic_evals.api.response import raise_kibana_error
+from elastic_evals.api.retry import retry_kibana_api_call
 from elastic_evals.integrations.agent_builder.constants import (
     AGENT_URL,
     AGENTS_URL,
@@ -29,8 +31,6 @@ from elastic_evals.integrations.agent_builder.models import (
     UpdateAgentRequest,
     UpdateToolRequest,
 )
-from elastic_evals.api.response import raise_kibana_error
-from elastic_evals.api.retry import retry_kibana_api_call
 from elastic_evals.utils.logging import log
 
 logger = log.getChild(__name__)

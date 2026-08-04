@@ -202,6 +202,7 @@ async def test_analysis_creators_preserve_legacy_results_through_kibana(
     correctness_result = await correctness.evaluate(params)
     groundedness_result = await groundedness.evaluate(params)
 
+    assert correctness.name == "Correctness Analysis"
     assert correctness_result.score is None
     assert correctness_result.label == "correctness-analysis"
     assert correctness_result.explanation == ("Factuality: FULLY_SUPPORTED, Relevance: RELEVANT, Sequence: MATCH")
