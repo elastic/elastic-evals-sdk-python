@@ -29,7 +29,22 @@ def create_quantitative_groundedness_evaluator(
     instrumentation_profile: InstrumentationProfile = "elastic-inference",
     log: logging.Logger | None = None,
 ) -> Evaluator:
-    return kibana_evaluators(
+    return create_groundedness_evaluators(
+        client=client,
+        connector_id=connector_id,
+        instrumentation_profile=instrumentation_profile,
+        log=log,
+    )[1]
+
+
+def create_groundedness_evaluators(
+    *,
+    client: KibanaEvaluatorsClient,
+    connector_id: str,
+    instrumentation_profile: InstrumentationProfile = "elastic-inference",
+    log: logging.Logger | None = None,
+) -> list[Evaluator]:
+    quantitative = kibana_evaluators(
         [
             KibanaEvaluatorConfig(
                 name="groundedness",
@@ -47,26 +62,40 @@ def create_quantitative_groundedness_evaluator(
         instrumentation_profile=instrumentation_profile,
         log=log,
     )[0]
+    return [_analysis_evaluator(quantitative), quantitative]
 
 
 def create_groundedness_analysis_evaluator(
     *,
-    inference_client: KibanaInferenceClient,
+    inference_client: KibanaInferenceClient | None = None,
+    client: KibanaEvaluatorsClient | None = None,
+    connector_id: str | None = None,
     log: logging.Logger,
     instrumentation_profile: InstrumentationProfile = "elastic-inference",
 ) -> Evaluator:
-    client = KibanaEvaluatorsClient(
-        kibana_url=inference_client.kibana_url,
-        api_key=inference_client.api_key,
-        timeout=inference_client.timeout,
-    )
-    groundedness = create_quantitative_groundedness_evaluator(
+    if client is None:
+        if inference_client is None:
+            raise ValueError("client and connector_id are required")
+        client = KibanaEvaluatorsClient(
+            kibana_url=inference_client.kibana_url,
+            api_key=inference_client.api_key,
+            timeout=inference_client.timeout,
+        )
+        connector_id = inference_client.connector_id
+    elif inference_client is not None:
+        raise ValueError("Pass either client or inference_client, not both")
+    elif not connector_id:
+        raise ValueError("connector_id is required")
+
+    return create_groundedness_evaluators(
         client=client,
-        connector_id=inference_client.connector_id,
+        connector_id=connector_id,
         instrumentation_profile=instrumentation_profile,
         log=log,
-    )
+    )[0]
 
+
+def _analysis_evaluator(groundedness: Evaluator) -> Evaluator:
     async def evaluate(params: EvaluatorParams) -> EvaluationResult:
         result = await groundedness.evaluate(params)
         if result.label in {"error", "unavailable"}:

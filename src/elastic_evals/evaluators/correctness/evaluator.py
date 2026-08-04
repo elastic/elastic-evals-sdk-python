@@ -47,39 +47,61 @@ def create_quantitative_correctness_evaluators(
     instrumentation_profile: InstrumentationProfile = "elastic-inference",
     log: logging.Logger | None = None,
 ) -> list[Evaluator]:
-    return kibana_evaluators(
+    return create_correctness_evaluators(
+        client=client,
+        connector_id=connector_id,
+        instrumentation_profile=instrumentation_profile,
+        log=log,
+    )[1:]
+
+
+def create_correctness_evaluators(
+    *,
+    client: KibanaEvaluatorsClient,
+    connector_id: str,
+    instrumentation_profile: InstrumentationProfile = "elastic-inference",
+    log: logging.Logger | None = None,
+) -> list[Evaluator]:
+    quantitative = kibana_evaluators(
         [_config(connector_id)],
         client=client,
         instrumentation_profile=instrumentation_profile,
         log=log,
     )
+    return [_analysis_evaluator(quantitative[0]), *quantitative]
 
 
 def create_correctness_analysis_evaluator(
     *,
-    inference_client: KibanaInferenceClient,
+    inference_client: KibanaInferenceClient | None = None,
+    client: KibanaEvaluatorsClient | None = None,
+    connector_id: str | None = None,
     log: logging.Logger,
     instrumentation_profile: InstrumentationProfile = "elastic-inference",
 ) -> Evaluator:
-    client = KibanaEvaluatorsClient(
-        kibana_url=inference_client.kibana_url,
-        api_key=inference_client.api_key,
-        timeout=inference_client.timeout,
-    )
-    factuality = kibana_evaluators(
-        [
-            KibanaEvaluatorConfig(
-                name="correctness",
-                kind="LLM",
-                connector_id=inference_client.connector_id,
-                sub_scores=(KibanaSubScore(key="factuality", evaluator_name="correctness"),),
-            )
-        ],
+    if client is None:
+        if inference_client is None:
+            raise ValueError("client and connector_id are required")
+        client = KibanaEvaluatorsClient(
+            kibana_url=inference_client.kibana_url,
+            api_key=inference_client.api_key,
+            timeout=inference_client.timeout,
+        )
+        connector_id = inference_client.connector_id
+    elif inference_client is not None:
+        raise ValueError("Pass either client or inference_client, not both")
+    elif not connector_id:
+        raise ValueError("connector_id is required")
+
+    return create_correctness_evaluators(
         client=client,
+        connector_id=connector_id,
         instrumentation_profile=instrumentation_profile,
         log=log,
     )[0]
 
+
+def _analysis_evaluator(factuality: Evaluator) -> Evaluator:
     async def evaluate(params: EvaluatorParams) -> EvaluationResult:
         result = await factuality.evaluate(params)
         if result.label in {"error", "unavailable"}:
@@ -94,7 +116,11 @@ def create_correctness_analysis_evaluator(
             metadata=result.metadata,
         )
 
-    return SimpleEvaluator(name=QUALITATIVE_EVALUATOR_NAME, kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(
+        name=QUALITATIVE_EVALUATOR_NAME,
+        kind="LLM",
+        evaluate=evaluate,
+    )
 
 
 def _analysis_explanation(summary: Any, fallback: str | None) -> str | None:

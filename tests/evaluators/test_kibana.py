@@ -27,10 +27,12 @@ from elastic_evals.evaluators import (
 )
 from elastic_evals.evaluators.correctness import (
     create_correctness_analysis_evaluator,
+    create_correctness_evaluators,
     create_quantitative_correctness_evaluators,
 )
 from elastic_evals.evaluators.groundedness import (
     create_groundedness_analysis_evaluator,
+    create_groundedness_evaluators,
     create_quantitative_groundedness_evaluator,
 )
 from elastic_evals.evaluators.kibana import (
@@ -143,8 +145,9 @@ async def test_correctness_and_groundedness_creators_use_kibana_evaluators() -> 
         client=client,
         connector_id="evaluator-connector",
     )
+    params = _params()
 
-    results = await asyncio.gather(*(evaluator.evaluate(_params()) for evaluator in correctness))
+    results = await asyncio.gather(*(evaluator.evaluate(params) for evaluator in correctness))
 
     assert [evaluator.name for evaluator in correctness] == [
         "Factuality",
@@ -173,22 +176,17 @@ async def test_correctness_and_groundedness_creators_use_kibana_evaluators() -> 
 
 
 @pytest.mark.asyncio
-async def test_analysis_creators_preserve_legacy_results_through_kibana(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    evaluate = AsyncMock(return_value=_response())
-    monkeypatch.setattr(KibanaEvaluatorsClient, "evaluate", evaluate)
-    inference_client = KibanaInferenceClient(
-        kibana_url="http://kibana:5601",
-        connector_id="evaluator-connector",
-        api_key="secret-key",
-    )
+async def test_analysis_creators_preserve_legacy_results_through_kibana() -> None:
+    client = AsyncMock(spec=KibanaEvaluatorsClient)
+    client.evaluate.return_value = _response()
     correctness = create_correctness_analysis_evaluator(
-        inference_client=inference_client,
+        client=client,
+        connector_id="evaluator-connector",
         log=logging.getLogger(__name__),
     )
     groundedness = create_groundedness_analysis_evaluator(
-        inference_client=inference_client,
+        client=client,
+        connector_id="evaluator-connector",
         log=logging.getLogger(__name__),
     )
     params = _params(trace_id="")
@@ -209,7 +207,65 @@ async def test_analysis_creators_preserve_legacy_results_through_kibana(
     assert groundedness_result.score is None
     assert groundedness_result.label == "groundedness-analysis"
     assert groundedness_result.metadata == {"summary_verdict": "GROUNDED"}
-    assert evaluate.await_count == 2
+    assert client.evaluate.await_count == 2
+
+
+def test_analysis_creators_accept_legacy_inference_client() -> None:
+    inference_client = KibanaInferenceClient(
+        kibana_url="http://kibana:5601",
+        connector_id="evaluator-connector",
+        api_key="secret-key",
+    )
+
+    correctness = create_correctness_analysis_evaluator(
+        inference_client=inference_client,
+        log=logging.getLogger(__name__),
+    )
+    groundedness = create_groundedness_analysis_evaluator(
+        inference_client=inference_client,
+        log=logging.getLogger(__name__),
+    )
+
+    assert correctness.name == "Correctness Analysis"
+    assert groundedness.name == "Groundedness Analysis"
+
+
+@pytest.mark.asyncio
+async def test_combined_analysis_and_quantitative_evaluators_share_requests() -> None:
+    client = AsyncMock(spec=KibanaEvaluatorsClient)
+    client.evaluate.return_value = _response()
+    correctness = create_correctness_evaluators(
+        client=client,
+        connector_id="evaluator-connector",
+    )
+    params = _params()
+
+    correctness_results = [await evaluator.evaluate(params) for evaluator in correctness]
+
+    assert [evaluator.name for evaluator in correctness] == [
+        "Correctness Analysis",
+        "Factuality",
+        "Relevance",
+        "Sequence Accuracy",
+    ]
+    assert [result.score for result in correctness_results] == [None, 0.9, 1.0, 0.8]
+    assert client.evaluate.await_count == 1
+
+    client.reset_mock()
+    groundedness = create_groundedness_evaluators(
+        client=client,
+        connector_id="evaluator-connector",
+    )
+    params = _params("2" * 32)
+
+    groundedness_results = [await evaluator.evaluate(params) for evaluator in groundedness]
+
+    assert [evaluator.name for evaluator in groundedness] == [
+        "Groundedness Analysis",
+        "Groundedness",
+    ]
+    assert [result.score for result in groundedness_results] == [None, 0.95]
+    assert client.evaluate.await_count == 1
 
 
 @pytest.mark.asyncio
@@ -246,8 +302,9 @@ async def test_kibana_evaluators_batch_one_request_and_map_scores() -> None:
         client=client,
         instrumentation_profile="otel-genai-attributes",
     )
+    params = _params()
 
-    results = await asyncio.gather(*(evaluator.evaluate(_params()) for evaluator in evaluators))
+    results = await asyncio.gather(*(evaluator.evaluate(params) for evaluator in evaluators))
 
     assert [evaluator.name for evaluator in evaluators] == [
         "Factuality",
@@ -290,11 +347,62 @@ async def test_kibana_evaluators_request_each_trace_once() -> None:
     client = AsyncMock(spec=KibanaEvaluatorsClient)
     client.evaluate.return_value = _response()
     evaluators = kibana_evaluators(_configs(), client=client)
+    first_params = _params("1" * 32)
 
-    await evaluators[0].evaluate(_params("1" * 32))
-    await evaluators[1].evaluate(_params("1" * 32))
+    await evaluators[0].evaluate(first_params)
+    await evaluators[1].evaluate(first_params)
     await evaluators[0].evaluate(_params("2" * 32))
 
+    assert client.evaluate.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_kibana_evaluators_do_not_reuse_results_across_evaluations() -> None:
+    client = AsyncMock(spec=KibanaEvaluatorsClient)
+    client.evaluate.return_value = _response()
+    evaluator = kibana_evaluators(
+        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        client=client,
+    )[0]
+
+    await evaluator.evaluate(_params("1" * 32))
+    await evaluator.evaluate(_params("1" * 32))
+
+    assert client.evaluate.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_kibana_evaluators_do_not_reuse_changed_reference_data() -> None:
+    client = AsyncMock(spec=KibanaEvaluatorsClient)
+    client.evaluate.return_value = _response()
+    evaluators = kibana_evaluators(_configs(), client=client)
+    params = _params()
+
+    await evaluators[0].evaluate(params)
+    params.expected["expected"] = "Changed expected answer"
+    await evaluators[1].evaluate(params)
+
+    assert client.evaluate.await_count == 2
+    assert client.evaluate.await_args.args[0].subject.traces[0].reference_data == {
+        "expected": "Changed expected answer"
+    }
+
+
+@pytest.mark.asyncio
+async def test_kibana_evaluators_do_not_cache_request_failures() -> None:
+    client = AsyncMock(spec=KibanaEvaluatorsClient)
+    client.evaluate.side_effect = [RuntimeError("Kibana unavailable"), _response()]
+    evaluator = kibana_evaluators(
+        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        client=client,
+    )[0]
+    params = _params()
+
+    with pytest.raises(RuntimeError, match="Kibana unavailable"):
+        await evaluator.evaluate(params)
+    result = await evaluator.evaluate(params)
+
+    assert result.score == 2.5
     assert client.evaluate.await_count == 2
 
 
@@ -371,8 +479,9 @@ async def test_kibana_evaluators_preserve_unavailable_and_partial_errors() -> No
         ],
         client=client,
     )
+    params = _params()
 
-    latency, groundedness = await asyncio.gather(*(evaluator.evaluate(_params()) for evaluator in evaluators))
+    latency, groundedness = await asyncio.gather(*(evaluator.evaluate(params) for evaluator in evaluators))
 
     assert latency.score is None
     assert latency.label == "unavailable"

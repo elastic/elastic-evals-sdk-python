@@ -163,15 +163,16 @@ class ElasticEvalsClient:
 
                 log_evaluation_start(example_index, repetition, len(evaluators))
 
+                params = EvaluatorParams(
+                    input=example.input,
+                    output=task_output,
+                    expected=example.output,
+                    metadata=example.metadata,
+                    trace_id=task_trace_id,
+                )
+
                 for evaluator in evaluators:
                     log_evaluator_start(evaluator.name, example_index, repetition)
-                    params = EvaluatorParams(
-                        input=example.input,
-                        output=task_output,
-                        expected=example.output,
-                        metadata=example.metadata,
-                        trace_id=task_trace_id,
-                    )
 
                     async def evaluator_runner() -> Any:
                         return await evaluator.evaluate(params)

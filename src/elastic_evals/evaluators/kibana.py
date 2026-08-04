@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import weakref
 from dataclasses import dataclass
 from typing import Any, Literal, Sequence
 
@@ -49,6 +50,12 @@ class _ScoreSelector:
     evaluator_name: str
 
 
+@dataclass(frozen=True)
+class _CachedEvaluation:
+    request_key: str
+    task: asyncio.Task[EvaluateResponse]
+
+
 class _EvaluationBatch:
     def __init__(
         self,
@@ -60,7 +67,7 @@ class _EvaluationBatch:
         self._client = client
         self._configs = tuple(configs)
         self._instrumentation_profile = instrumentation_profile
-        self._evaluations: dict[str, asyncio.Task[EvaluateResponse]] = {}
+        self._evaluations: weakref.WeakKeyDictionary[object, _CachedEvaluation] = weakref.WeakKeyDictionary()
         self._lock = asyncio.Lock()
 
     async def evaluate(self, params: EvaluatorParams) -> EvaluateResponse:
@@ -68,13 +75,27 @@ class _EvaluationBatch:
         if not trace_id:
             raise ValueError("A trace ID is required for Kibana evaluators")
 
-        async with self._lock:
-            evaluation = self._evaluations.get(trace_id)
-            if evaluation is None:
-                evaluation = asyncio.create_task(self._client.evaluate(self._build_request(params, trace_id)))
-                self._evaluations[trace_id] = evaluation
+        request = self._build_request(params, trace_id)
+        request_key = request.model_dump_json(exclude_none=True)
+        scope = params._evaluation_scope
 
-        return await asyncio.shield(evaluation)
+        async with self._lock:
+            cached = self._evaluations.get(scope)
+            if cached is None or cached.request_key != request_key:
+                cached = _CachedEvaluation(
+                    request_key=request_key,
+                    task=asyncio.create_task(self._client.evaluate(request)),
+                )
+                self._evaluations[scope] = cached
+
+        try:
+            return await asyncio.shield(cached.task)
+        except Exception:
+            async with self._lock:
+                current = self._evaluations.get(scope)
+                if current is cached:
+                    del self._evaluations[scope]
+            raise
 
     def _build_request(self, params: EvaluatorParams, trace_id: str) -> EvaluateRequest:
         reference_data: dict[str, Any] | None
@@ -189,7 +210,7 @@ def kibana_evaluators(
     instrumentation_profile: InstrumentationProfile = "elastic-inference",
     log: logging.Logger | None = None,
 ) -> list[Evaluator]:
-    """Create Python evaluators backed by one Kibana request per trace."""
+    """Create Python evaluators backed by one Kibana request per evaluation."""
     _validate_configs(configs)
     immutable_configs = tuple(configs)
     selectors = _build_selectors(immutable_configs)
