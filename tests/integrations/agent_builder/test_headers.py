@@ -2,7 +2,7 @@
 # or more contributor license agreements. Licensed under the Elastic License 2.0;
 # you may not use this file except in compliance with the Elastic License 2.0.
 
-from elastic_evals._internal.agent_builder import build_agent_builder_headers  # noqa: PLC2701
+from elastic_evals.integrations.agent_builder import build_agent_builder_headers
 
 
 def test_build_agent_builder_headers_without_api_key() -> None:

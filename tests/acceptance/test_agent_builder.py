@@ -17,7 +17,7 @@ from urllib.parse import quote
 import httpx
 import pytest
 
-from elastic_evals._internal.agent_builder import (  # noqa: PLC2701
+from elastic_evals.integrations.agent_builder import (
     AgentBuilderClient,
     AgentConfiguration,
     CreateAgentRequest,

@@ -13,7 +13,7 @@ import pytest
 from pydantic import ValidationError
 from tenacity import wait_none
 
-from elastic_evals._internal.agent_builder import (  # noqa: PLC2701
+from elastic_evals.integrations.agent_builder import (
     AgentBuilderClient,
     AgentBuilderError,
     AgentConfiguration,
@@ -78,7 +78,7 @@ class _RecordingAsyncClient:
 @pytest.fixture(autouse=True)
 def _mock_http_client(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "elastic_evals._internal.agent_builder.client.httpx.AsyncClient",
+        "elastic_evals.integrations.agent_builder.client.httpx.AsyncClient",
         _RecordingAsyncClient,
     )
     monkeypatch.setattr(AgentBuilderClient._create_tool.retry, "wait", wait_none())
