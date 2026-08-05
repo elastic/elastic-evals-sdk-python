@@ -128,6 +128,17 @@ class KibanaInferenceClient:
         self.timeout = timeout
         self.api_key = api_key
 
+    def _request_headers(self) -> dict[str, str]:
+        headers = {
+            "kbn-xsrf": "true",
+            "Content-Type": "application/json",
+            "x-elastic-internal-origin": "true",
+            **propagated_headers(),
+        }
+        if self.api_key:
+            headers["Authorization"] = f"ApiKey {self.api_key}"
+        return headers
+
     @retry(
         reraise=True,
         stop=stop_after_attempt(3),
@@ -163,14 +174,7 @@ class KibanaInferenceClient:
             }
         }
 
-        headers = {
-            "kbn-xsrf": "true",
-            "Content-Type": "application/json",
-            "x-elastic-internal-origin": "true",
-            **propagated_headers(),
-        }
-        if self.api_key:
-            headers["Authorization"] = f"ApiKey {self.api_key}"
+        headers = self._request_headers()
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=payload, headers=headers)
@@ -224,14 +228,7 @@ class KibanaInferenceClient:
         if model_name is not None:
             payload["modelName"] = model_name
 
-        headers = {
-            "kbn-xsrf": "true",
-            "Content-Type": "application/json",
-            "x-elastic-internal-origin": "true",
-            **propagated_headers(),
-        }
-        if self.api_key:
-            headers["Authorization"] = f"ApiKey {self.api_key}"
+        headers = self._request_headers()
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=payload, headers=headers)

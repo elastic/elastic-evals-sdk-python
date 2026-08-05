@@ -6,20 +6,16 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
-from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential
-
+from elastic_evals.api import InstrumentationProfile, KibanaEvaluatorsClient
 from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.evaluators.correctness.prompt import PROMPT, tool_choice
-from elastic_evals.evaluators.correctness.scoring import (
-    calculate_factual_score,
-    calculate_procedural_fidelity_score,
-    calculate_relevance_score,
+from elastic_evals.evaluators.kibana import (
+    KibanaEvaluatorConfig,
+    KibanaSubScore,
+    kibana_evaluators,
 )
-from elastic_evals.evaluators.correctness.types import CorrectnessAnalysis
 from elastic_evals.inference import KibanaInferenceClient
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
 
@@ -28,117 +24,110 @@ FACTUALITY_EVALUATOR_NAME = "Factuality"
 RELEVANCE_EVALUATOR_NAME = "Relevance"
 SEQUENCE_ACCURACY_EVALUATOR_NAME = "Sequence Accuracy"
 
-
-def _parse_tool_arguments(tool_call: Any) -> dict[str, Any]:
-    if not tool_call or not tool_call.function:
-        raise ValueError("No tool call found in LLM response")
-    arguments = tool_call.function.get("arguments") if isinstance(tool_call.function, dict) else None
-    if arguments is None:
-        raise ValueError("No tool arguments found in LLM response")
-    if isinstance(arguments, str):
-        return json.loads(arguments)
-    if isinstance(arguments, dict):
-        return arguments
-    raise ValueError("Invalid tool arguments in LLM response")
+_SUB_SCORES = (
+    KibanaSubScore(key="factuality", evaluator_name=FACTUALITY_EVALUATOR_NAME),
+    KibanaSubScore(key="relevance", evaluator_name=RELEVANCE_EVALUATOR_NAME),
+    KibanaSubScore(key="sequence_accuracy", evaluator_name=SEQUENCE_ACCURACY_EVALUATOR_NAME),
+)
 
 
-async def _run_with_retries(log: logging.Logger, fn, kind: str) -> CorrectnessAnalysis:
-    async for attempt in AsyncRetrying(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=10),
-        reraise=True,
-    ):
-        with attempt:
-            return await fn()
-
-    raise RuntimeError(f"{kind} retries exhausted")
+def _config(connector_id: str) -> KibanaEvaluatorConfig:
+    return KibanaEvaluatorConfig(
+        name="correctness",
+        kind="LLM",
+        connector_id=connector_id,
+        sub_scores=_SUB_SCORES,
+    )
 
 
-def create_correctness_analysis_evaluator(*, inference_client: KibanaInferenceClient, log: logging.Logger) -> Evaluator:
-    async def evaluate(params: EvaluatorParams) -> EvaluationResult:
-        async def run_analysis() -> CorrectnessAnalysis:
-            user_query = (params.input or {}).get("question")
-            messages = (params.output or {}).get("messages") or []
-            latest_message = messages[-1].get("message") if messages else None
-            ground_truth_response = (params.expected or {}).get("expected") if params.expected else None
+def create_quantitative_correctness_evaluators(
+    *,
+    client: KibanaEvaluatorsClient,
+    connector_id: str,
+    instrumentation_profile: InstrumentationProfile = "elastic-inference",
+    log: logging.Logger | None = None,
+) -> list[Evaluator]:
+    return create_correctness_evaluators(
+        client=client,
+        connector_id=connector_id,
+        instrumentation_profile=instrumentation_profile,
+        log=log,
+    )[1:]
 
-            response = await inference_client.prompt(
-                prompt=PROMPT,
-                input_data={
-                    "user_query": str(user_query or ""),
-                    "agent_response": str(latest_message or ""),
-                    "ground_truth_response": str(ground_truth_response or ""),
-                },
-                tool_choice=tool_choice(),
-            )
 
-            tool_calls = response.tool_calls or []
-            if not tool_calls:
-                raise ValueError("No tool call found in LLM response")
-            analysis_payload = _parse_tool_arguments(tool_calls[0])
-            return CorrectnessAnalysis.model_validate(analysis_payload)
+def create_correctness_evaluators(
+    *,
+    client: KibanaEvaluatorsClient,
+    connector_id: str,
+    instrumentation_profile: InstrumentationProfile = "elastic-inference",
+    log: logging.Logger | None = None,
+) -> list[Evaluator]:
+    quantitative = kibana_evaluators(
+        [_config(connector_id)],
+        client=client,
+        instrumentation_profile=instrumentation_profile,
+        log=log,
+    )
+    return [_analysis_evaluator(quantitative[0]), *quantitative]
 
-        try:
-            correctness_analysis = await _run_with_retries(log, run_analysis, "correctness analysis")
-        except Exception as exc:
-            log.error(
-                "Failed to retrieve correctness analysis after retries (no valid tool call or malformed response)",
-                exc_info=exc,
-            )
-            raise
 
-        summary = correctness_analysis.summary
-        explanation = (
-            f"Factuality: {summary.factual_accuracy_summary}, "
-            f"Relevance: {summary.relevance_summary}, "
-            f"Sequence: {summary.sequence_accuracy_summary}"
+def create_correctness_analysis_evaluator(
+    *,
+    inference_client: KibanaInferenceClient | None = None,
+    client: KibanaEvaluatorsClient | None = None,
+    connector_id: str | None = None,
+    log: logging.Logger,
+    instrumentation_profile: InstrumentationProfile = "elastic-inference",
+) -> Evaluator:
+    if client is None:
+        if inference_client is None:
+            raise ValueError("client and connector_id are required")
+        client = KibanaEvaluatorsClient(
+            kibana_url=inference_client.kibana_url,
+            api_key=inference_client.api_key,
+            timeout=inference_client.timeout,
         )
+        connector_id = inference_client.connector_id
+    elif inference_client is not None:
+        raise ValueError("Pass either client or inference_client, not both")
+    elif not connector_id:
+        raise ValueError("connector_id is required")
 
+    return create_correctness_evaluators(
+        client=client,
+        connector_id=connector_id,
+        instrumentation_profile=instrumentation_profile,
+        log=log,
+    )[0]
+
+
+def _analysis_evaluator(factuality: Evaluator) -> Evaluator:
+    async def evaluate(params: EvaluatorParams) -> EvaluationResult:
+        result = await factuality.evaluate(params)
+        if result.label in {"error", "unavailable"}:
+            return result
+
+        summary = (result.metadata or {}).get("summary", {})
+        explanation = _analysis_explanation(summary, result.explanation)
         return EvaluationResult(
             score=None,
             label="correctness-analysis",
             explanation=explanation,
-            metadata=correctness_analysis.model_dump(),
+            metadata=result.metadata,
         )
 
-    return SimpleEvaluator(name="correctness", kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(
+        name=QUALITATIVE_EVALUATOR_NAME,
+        kind="LLM",
+        evaluate=evaluate,
+    )
 
 
-def create_quantitative_correctness_evaluators() -> list[Evaluator]:
-    def extract_correctness_analysis(output: Any) -> CorrectnessAnalysis | None:
-        analysis_data = (output or {}).get("correctnessAnalysis")
-        if not analysis_data:
-            return None
-        return CorrectnessAnalysis.model_validate(analysis_data)
-
-    def quantitative_evaluator(name: str, score_calculator, summary_key: str) -> Evaluator:
-        async def evaluate(params: EvaluatorParams) -> EvaluationResult:
-            correctness_analysis = extract_correctness_analysis(params.output)
-            if not correctness_analysis:
-                return EvaluationResult(
-                    score=None,
-                    label="unavailable",
-                    explanation="No correctness analysis available",
-                    metadata=params.metadata or None,
-                )
-
-            score = score_calculator(correctness_analysis)
-            summary_text = getattr(correctness_analysis.summary, summary_key)
-            return EvaluationResult(
-                score=score,
-                label=summary_text,
-                explanation=summary_text,
-                metadata=params.metadata or None,
-            )
-
-        return SimpleEvaluator(name=name, kind="LLM", evaluate=evaluate)
-
-    return [
-        quantitative_evaluator("Factuality", calculate_factual_score, "factual_accuracy_summary"),
-        quantitative_evaluator("Relevance", calculate_relevance_score, "relevance_summary"),
-        quantitative_evaluator(
-            "Sequence Accuracy",
-            calculate_procedural_fidelity_score,
-            "sequence_accuracy_summary",
-        ),
-    ]
+def _analysis_explanation(summary: Any, fallback: str | None) -> str | None:
+    if not isinstance(summary, dict):
+        return fallback
+    return (
+        f"Factuality: {summary.get('factual_accuracy_summary')}, "
+        f"Relevance: {summary.get('relevance_summary')}, "
+        f"Sequence: {summary.get('sequence_accuracy_summary')}"
+    )

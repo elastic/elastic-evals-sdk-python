@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, Protocol, TypeAlias, TypeVar
 
 from pydantic import BaseModel
@@ -18,6 +18,10 @@ TTaskOutput = TypeVar("TTaskOutput")
 TExample = TypeVar("TExample", bound="Example")
 
 TaskOutput: TypeAlias = Any
+
+
+class _EvaluationScope:
+    pass
 
 
 class Example(BaseModel, Generic[TInput, TExpected, TMetadata]):
@@ -63,6 +67,8 @@ class EvaluatorParams(Generic[TInput, TExpected, TMetadata, TTaskOutput]):
     output: TTaskOutput
     expected: TExpected | None
     metadata: TMetadata
+    trace_id: str | None = None
+    _evaluation_scope: object = field(default_factory=_EvaluationScope, compare=False, repr=False)
 
 
 class Evaluator(Protocol, Generic[TInput, TExpected, TMetadata, TTaskOutput]):

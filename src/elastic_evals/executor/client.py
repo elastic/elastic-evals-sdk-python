@@ -17,6 +17,7 @@ from elastic_evals.api import (
     Ci,
     Environment,
     KibanaDatasetsClient,
+    KibanaEvaluatorsClient,
     Model,
     RunMetadata,
     UpsertDatasetExamplePayload,
@@ -70,6 +71,10 @@ class ElasticEvalsClient:
             kibana_url=self.config.kibana_url,
             api_key=self.config.kibana_api_key,
         )
+        self._evaluators_client = KibanaEvaluatorsClient(
+            kibana_url=self.config.kibana_url,
+            api_key=self.config.kibana_api_key,
+        )
 
     def get_inference_client(self) -> KibanaInferenceClient:
         if self._inference_client is None:
@@ -81,12 +86,16 @@ class ElasticEvalsClient:
             )
         return self._inference_client
 
+    def get_evaluators_client(self) -> KibanaEvaluatorsClient:
+        return self._evaluators_client
+
     async def run_experiment(
         self,
         *,
         dataset: EvaluationDataset,
         task: ExperimentTask,
         evaluators: list[Evaluator],
+        experiment_name: str | None = None,
         metadata: dict[str, Any] | None = None,
         concurrency: int | None = None,
     ) -> RanExperiment:
@@ -154,14 +163,16 @@ class ElasticEvalsClient:
 
                 log_evaluation_start(example_index, repetition, len(evaluators))
 
+                params = EvaluatorParams(
+                    input=example.input,
+                    output=task_output,
+                    expected=example.output,
+                    metadata=example.metadata,
+                    trace_id=task_trace_id,
+                )
+
                 for evaluator in evaluators:
                     log_evaluator_start(evaluator.name, example_index, repetition)
-                    params = EvaluatorParams(
-                        input=example.input,
-                        output=task_output,
-                        expected=example.output,
-                        metadata=example.metadata,
-                    )
 
                     async def evaluator_runner() -> Any:
                         return await evaluator.evaluate(params)
@@ -195,6 +206,7 @@ class ElasticEvalsClient:
                         example_input=self._dict_or_none(example.input),
                         task_run=task_run,
                         evaluation_run=evaluation_runs[-1],
+                        experiment_name=experiment_name,
                     )
                     await self._scores_client.ingest_scores(score_payload)
                     log_evaluator_complete(evaluator.name, example_index, repetition)

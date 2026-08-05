@@ -33,3 +33,9 @@ def test_build_kibana_headers_with_empty_api_key() -> None:
     assert headers["x-elastic-internal-origin"] == "true"
     assert headers["Elastic-Api-Version"] == "1"
     assert "Authorization" not in headers
+
+
+def test_build_kibana_headers_with_custom_api_version() -> None:
+    headers = build_kibana_headers(None, api_version="2023-10-31")
+
+    assert headers["Elastic-Api-Version"] == "2023-10-31"

@@ -11,7 +11,9 @@ from typing import Any
 
 
 @dataclass
-class IngestScoresError(RuntimeError):
+class KibanaAPIError(RuntimeError):
+    """Base error raised for unsuccessful Kibana evals API requests."""
+
     message: str
     status_code: int | None = None
     body: Any = None
@@ -21,12 +23,13 @@ class IngestScoresError(RuntimeError):
         return self.message
 
 
-@dataclass
-class DatasetSyncError(RuntimeError):
-    message: str
-    status_code: int | None = None
-    body: Any = None
-    retryable: bool = False
+class IngestScoresError(KibanaAPIError):
+    """Error raised by the Kibana score ingestion API."""
 
-    def __str__(self) -> str:
-        return self.message
+
+class DatasetSyncError(KibanaAPIError):
+    """Error raised by the Kibana dataset sync APIs."""
+
+
+class KibanaEvaluatorsError(KibanaAPIError):
+    """Error raised by the Kibana evaluators APIs."""
