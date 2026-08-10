@@ -8,35 +8,27 @@ import asyncio
 import os
 from typing import Any
 
-import httpx
 from dotenv import load_dotenv
 
-from elastic_evals.agent_builder import (
+from elastic_evals.api.datasets_models import UpsertDatasetExamplePayload
+from elastic_evals.config import ElasticEvalsConfig
+from elastic_evals.evaluators.base import SimpleEvaluator
+from elastic_evals.evaluators.correctness import create_correctness_evaluators
+from elastic_evals.evaluators.criteria import EvaluationCriterion, create_criteria_evaluator
+from elastic_evals.evaluators.groundedness import create_groundedness_evaluators
+from elastic_evals.evaluators.input_tokens import create_input_tokens_evaluator
+from elastic_evals.evaluators.latency import create_latency_evaluator
+from elastic_evals.evaluators.output_tokens import create_output_tokens_evaluator
+from elastic_evals.evaluators.tool_calls import create_tool_calls_evaluator
+from elastic_evals.executor import ElasticEvalsClient
+from elastic_evals.integrations.agent_builder import (
     AgentBuilderClient,
     AgentConfiguration,
     CreateAgentRequest,
     CreateToolRequest,
     IndexSearchToolConfig,
     ToolSelection,
-    build_agent_builder_headers,
 )
-from elastic_evals.api.datasets_models import UpsertDatasetExamplePayload
-from elastic_evals.config import ElasticEvalsConfig
-from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.evaluators.correctness import (
-    create_correctness_analysis_evaluator,
-    create_quantitative_correctness_evaluators,
-)
-from elastic_evals.evaluators.criteria import create_criteria_evaluator
-from elastic_evals.evaluators.groundedness import (
-    create_groundedness_analysis_evaluator,
-    create_quantitative_groundedness_evaluator,
-)
-from elastic_evals.evaluators.input_tokens import create_input_tokens_evaluator
-from elastic_evals.evaluators.latency import create_latency_evaluator
-from elastic_evals.evaluators.output_tokens import create_output_tokens_evaluator
-from elastic_evals.evaluators.tool_calls import create_tool_calls_evaluator
-from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.tracing import init_tracing
 from elastic_evals.types import (
     EvaluationDataset,
@@ -67,7 +59,7 @@ USE_GCP = False
 DATASET_NAME = "wix_qa_managed_workflow"
 DATASET_DESCRIPTION = "WixQA golden Q&A pairs for the managed evaluation workflow."
 
-WIX_RESPONSE_CRITERIA = [
+WIX_RESPONSE_CRITERIA: list[EvaluationCriterion] = [
     "The response directly addresses the user's Wix support question.",
     "The response provides clear and actionable guidance.",
 ]
@@ -110,44 +102,29 @@ def create_document_recall_evaluator(*, tool_id: str) -> Evaluator:
 
 
 async def agent_builder_task(
-    example: Example, config: ElasticEvalsConfig, agent_id: str | None = None
+    example: Example,
+    client: AgentBuilderClient,
+    *,
+    connector_id: str,
+    agent_id: str | None = None,
 ) -> dict[str, Any]:
     """Call Agent Builder API and return response."""
 
-    request_body: dict[str, Any] = {
-        "connector_id": config.connector_id,
-        "input": example.input.get("question"),
-    }
-    if agent_id is not None:
-        request_body["agent_id"] = agent_id
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{config.kibana_url}/api/agent_builder/converse",
-            json=request_body,
-            headers=build_agent_builder_headers(config.kibana_api_key),
-        )
-
-        response.raise_for_status()
-        data = response.json()
-
-    response_payload = data.get("response", {})
-    message = response_payload.get("message")
-    raw_trace_id = data.get("trace_id") or data.get("traceId")
-    if isinstance(raw_trace_id, list):
-        trace_id = next((value for value in raw_trace_id if isinstance(value, str)), None)
-    else:
-        trace_id = raw_trace_id if isinstance(raw_trace_id, str) else None
+    response = await client.call_converse(
+        example.input.get("question"),
+        agent_id=agent_id,
+        connector_id=connector_id,
+    )
 
     task_output = {
-        "messages": [{"message": message}] if message is not None else [],
-        "steps": data.get("steps", []),
-        "traceId": trace_id,
-        "conversation_id": data.get("conversation_id"),
+        "messages": [{"message": response.message}] if response.message else [],
+        "steps": [step.model_dump(exclude_none=True) for step in response.steps],
+        "traceId": response.trace_id,
+        "conversation_id": response.conversation_id,
     }
 
-    if trace_id:
-        task_output["_interaction_trace_id"] = trace_id
+    if response.trace_id:
+        task_output["_interaction_trace_id"] = response.trace_id
     return task_output
 
 
@@ -190,7 +167,6 @@ async def main() -> None:
     print("\nLoading dataset into elastic-evals...")
     examples = [
         UpsertDatasetExamplePayload(
-            id=row["meta_query_id"],
             input={"question": row["input_question"]},
             output={"expected": row["output_expected"]},
             metadata={
@@ -242,7 +218,8 @@ async def main() -> None:
     # NOTE: as an alternative, I can call .run_experiment() directly and pass the dataset, which is going to be uploaded.
     print("\nGetting inference client from ElasticEvalsClient...")
     inference_client = elastic_evals_client.get_inference_client()  # to be used later for llm as a judge...
-    trace_client = elastic_evals_client.get_trace_client()
+    evaluators_client = elastic_evals_client.get_evaluators_client()
+    evaluator_connector_id = config.evaluator_connector_id or config.connector_id
     log = config.logger
 
     # (6) Setup agent builder:
@@ -250,6 +227,7 @@ async def main() -> None:
     ab_client = AgentBuilderClient(
         kibana_url=os.environ.get("KIBANA_URL", "http://localhost:5601"),
         api_key=os.environ.get("KIBANA_API_KEY"),
+        timeout=120.0,
     )
     print("Creating tool for searching the knowledge base...")
     tool = await ab_client.create_tool(
@@ -279,9 +257,6 @@ async def main() -> None:
     print(f"Agent created — verify in UI: {os.environ['KIBANA_URL']}/app/agent_builder/manage/agents/{agent.id}")
 
     # (7) Create built-in evaluators:
-    correctness_analysis = create_correctness_analysis_evaluator(inference_client=inference_client, log=log)
-    groundedness_analysis = create_groundedness_analysis_evaluator(inference_client=inference_client, log=log)
-
     criteria_evaluator = create_criteria_evaluator(
         inference_client=inference_client,
         criteria=WIX_RESPONSE_CRITERIA,
@@ -292,30 +267,32 @@ async def main() -> None:
     document_recall_evaluator = create_document_recall_evaluator(tool_id=SEARCH_TOOL_ID)
 
     evaluators = [
-        *create_quantitative_correctness_evaluators(),
-        create_quantitative_groundedness_evaluator(),
+        *create_correctness_evaluators(
+            client=evaluators_client,
+            connector_id=evaluator_connector_id,
+            log=log,
+        ),
+        *create_groundedness_evaluators(
+            client=evaluators_client,
+            connector_id=evaluator_connector_id,
+            log=log,
+        ),
         criteria_evaluator,
-        create_latency_evaluator(trace_client=trace_client, log=log),
-        create_input_tokens_evaluator(trace_client=trace_client, log=log),
-        create_output_tokens_evaluator(trace_client=trace_client, log=log),
-        create_tool_calls_evaluator(trace_client=trace_client, log=log),
+        create_latency_evaluator(client=evaluators_client, log=log),
+        create_input_tokens_evaluator(client=evaluators_client, log=log),
+        create_output_tokens_evaluator(client=evaluators_client, log=log),
+        create_tool_calls_evaluator(client=evaluators_client, log=log),
         document_recall_evaluator,
     ]
 
     # (9) Run experiment + evals:
     async def task(example: Example):
-        response = await agent_builder_task(example, config, agent_id=agent.id)
-        params = EvaluatorParams(
-            input=example.input,
-            output=response,
-            expected=example.output,
-            metadata=example.metadata,
+        return await agent_builder_task(
+            example,
+            ab_client,
+            connector_id=config.connector_id,
+            agent_id=agent.id,
         )
-        correctness_result = await correctness_analysis.evaluate(params)
-        groundedness_result = await groundedness_analysis.evaluate(params)
-        response["correctnessAnalysis"] = correctness_result.metadata
-        response["groundednessAnalysis"] = groundedness_result.metadata
-        return response
 
     await elastic_evals_client.run_experiment(
         dataset=examples_dataset,

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import inspect
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -19,10 +20,16 @@ from elastic_evals.api import (  # noqa: E402
     RunMetadata,
 )
 from elastic_evals.config import ElasticEvalsConfig  # noqa: E402
+from elastic_evals.integrations.agent_builder import (  # noqa: E402
+    AgentBuilderClient,
+    ConverseResponse,
+    ConverseStep,
+)
 from elastic_evals.types import (  # noqa: E402
     EvaluationResult,
     EvaluationRun,
     EvaluatorParams,
+    Example,
     RunData,
 )
 from examples.opik_vs_elastic import run as opik_vs_elastic_run  # noqa: E402
@@ -64,6 +71,54 @@ def test_parse_relevant_doc_ids() -> None:
 
     with pytest.raises(ValueError, match="must be a dictionary"):
         _parse_relevant_doc_ids("not a dictionary")
+
+
+@pytest.mark.parametrize(
+    "module",
+    [opik_vs_elastic_run, granular_run],
+    ids=["managed", "granular"],
+)
+@pytest.mark.asyncio
+async def test_agent_builder_task_uses_client_and_preserves_trace(module: Any) -> None:
+    client = AsyncMock(spec=AgentBuilderClient)
+    client.call_converse.return_value = ConverseResponse(
+        message="Use the site settings.",
+        steps=[
+            ConverseStep(
+                type="tool_call",
+                tool_id=TOOL_ID,
+                results=[{"data": {"reference": {"id": "doc-1"}}}],
+            )
+        ],
+        conversation_id="conversation-1",
+        trace_id="1" * 32,
+    )
+
+    result = await module.agent_builder_task(
+        Example(input={"question": "How do I configure my Wix site?"}),
+        client,
+        connector_id="task-connector",
+        agent_id="wix-agent",
+    )
+
+    client.call_converse.assert_awaited_once_with(
+        "How do I configure my Wix site?",
+        agent_id="wix-agent",
+        connector_id="task-connector",
+    )
+    assert result == {
+        "messages": [{"message": "Use the site settings."}],
+        "steps": [
+            {
+                "type": "tool_call",
+                "tool_id": TOOL_ID,
+                "results": [{"data": {"reference": {"id": "doc-1"}}}],
+            }
+        ],
+        "traceId": "1" * 32,
+        "conversation_id": "conversation-1",
+        "_interaction_trace_id": "1" * 32,
+    }
 
 
 @pytest.mark.asyncio

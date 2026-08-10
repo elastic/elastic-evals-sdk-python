@@ -174,7 +174,7 @@ run SDK-side and custom evaluators, and ingest their scores.
 
 ```bash
 cd /Users/mafaldasavelho/Documents/work-repos/kibana-fork/evals-python-sdk/elastic-evals-sdk-python
-uv run --no-sync python examples/opik_vs_elastic/run.py
+uv run --no-sync python -m examples.opik_vs_elastic.run
 ```
 
 ### `run2.py`: granular workflow
@@ -184,5 +184,5 @@ coordinates the Dataset, Evaluators, and Score Ingestion APIs, runs the custom
 Document Recall evaluator, and attaches external Orca scores.
 
 ```bash
-uv run --no-sync python examples/opik_vs_elastic/run2.py
+uv run --no-sync python -m examples.opik_vs_elastic.run2
 ```

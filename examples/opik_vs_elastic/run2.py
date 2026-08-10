@@ -12,20 +12,10 @@ import uuid
 from collections.abc import Iterable, Mapping
 from typing import Any, cast
 
-import httpx
 from dotenv import load_dotenv
 from orca.evaluation.evaluators.retrieval import F1AtK, PrecisionAtK, RecallAtK  # type: ignore[import-untyped]
 from orca.evaluation.evidence.types import EvaluationEvidence, EvidenceArtifact  # type: ignore[import-untyped]
 
-from elastic_evals.agent_builder import (
-    AgentBuilderClient,
-    AgentConfiguration,
-    CreateAgentRequest,
-    CreateToolRequest,
-    IndexSearchToolConfig,
-    ToolSelection,
-    build_agent_builder_headers,
-)
 from elastic_evals.api import (
     Environment,
     EvaluateEvaluatorConfig,
@@ -48,6 +38,14 @@ from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.export import build_ingest_score_item, get_git_metadata
+from elastic_evals.integrations.agent_builder import (
+    AgentBuilderClient,
+    AgentConfiguration,
+    CreateAgentRequest,
+    CreateToolRequest,
+    IndexSearchToolConfig,
+    ToolSelection,
+)
 from elastic_evals.tracing import init_tracing, with_evaluator_span, with_task_span
 from elastic_evals.types import EvaluationResult, EvaluationRun, Evaluator, EvaluatorParams, Example, RunData
 from examples.opik_vs_elastic.helpers.data import load_wix_data, select_qa_examples
@@ -121,44 +119,29 @@ def create_document_recall_evaluator(*, tool_id: str) -> Evaluator:
 
 
 async def agent_builder_task(
-    example: Example, config: ElasticEvalsConfig, agent_id: str | None = None
+    example: Example,
+    client: AgentBuilderClient,
+    *,
+    connector_id: str,
+    agent_id: str | None = None,
 ) -> dict[str, Any]:
     """Call Agent Builder API and return response."""
 
-    request_body: dict[str, Any] = {
-        "connector_id": config.connector_id,
-        "input": example.input.get("question"),
-    }
-    if agent_id is not None:
-        request_body["agent_id"] = agent_id
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{config.kibana_url}/api/agent_builder/converse",
-            json=request_body,
-            headers=build_agent_builder_headers(config.kibana_api_key),
-        )
-
-        response.raise_for_status()
-        data = response.json()
-
-    response_payload = data.get("response", {})
-    message = response_payload.get("message")
-    raw_trace_id = data.get("trace_id") or data.get("traceId")
-    if isinstance(raw_trace_id, list):
-        trace_id = next((value for value in raw_trace_id if isinstance(value, str)), None)
-    else:
-        trace_id = raw_trace_id if isinstance(raw_trace_id, str) else None
+    response = await client.call_converse(
+        example.input.get("question"),
+        agent_id=agent_id,
+        connector_id=connector_id,
+    )
 
     task_output = {
-        "messages": [{"message": message}] if message is not None else [],
-        "steps": data.get("steps", []),
-        "traceId": trace_id,
-        "conversation_id": data.get("conversation_id"),
+        "messages": [{"message": response.message}] if response.message else [],
+        "steps": [step.model_dump(exclude_none=True) for step in response.steps],
+        "traceId": response.trace_id,
+        "conversation_id": response.conversation_id,
     }
 
-    if trace_id:
-        task_output["_interaction_trace_id"] = trace_id
+    if response.trace_id:
+        task_output["_interaction_trace_id"] = response.trace_id
     return task_output
 
 
@@ -407,7 +390,11 @@ async def main() -> None:
         timeout=180.0,
     )
     scores_client = KibanaScoresClient(config.kibana_url, api_key=config.kibana_api_key)
-    agent_builder_client = AgentBuilderClient(config.kibana_url, api_key=config.kibana_api_key)
+    agent_builder_client = AgentBuilderClient(
+        config.kibana_url,
+        api_key=config.kibana_api_key,
+        timeout=120.0,
+    )
 
     experiment_id = str(uuid.uuid4())
     print(f"Experiment: {EXPERIMENT_NAME}\nExperiment ID: {experiment_id}")
@@ -484,7 +471,8 @@ async def main() -> None:
             async def task_runner() -> dict[str, Any]:
                 return await agent_builder_task(
                     sdk_example,
-                    config,
+                    agent_builder_client,
+                    connector_id=config.connector_id,
                     agent_id=agent.id,
                 )
 
