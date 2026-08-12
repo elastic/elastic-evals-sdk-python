@@ -24,6 +24,20 @@ Then edit `.env` and set:
 - `LLM_TYPE` and the corresponding provider keys.
 - `ELASTICSEARCH_URL`, `ELASTICSEARCH_USER`, and `ELASTICSEARCH_PASSWORD` for your stack.
 
+## Run EDOT collector for Phoenix trace export
+
+From `examples/chatbot_rag_app/`:
+
+```bash
+docker run --rm -p 4317:4317 -p 4318:4318 \
+  -v "$(pwd)/otel-collector-config.yml:/etc/otelcol/config.yaml:ro" \
+  docker.elastic.co/observability/elastic-otel-collector:latest \
+  --config=/etc/otelcol/config.yaml
+```
+
+This forwards traces received on `localhost:4318` to Phoenix at
+`http://localhost:6006/v1/traces` using the OTLP HTTP exporter.
+
 ## Start the app
 
 ```bash

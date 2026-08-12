@@ -17,6 +17,20 @@ so you can observe both sides — the eval harness and Claude Code itself — in
 3. `claude` CLI installed and authenticated (`claude --version`).
 4. A Kibana LLM connector for dataset storage and optional criteria scoring.
 
+## Run EDOT collector for Phoenix trace export
+
+From `examples/claude_code_eval/`:
+
+```bash
+docker run --rm -p 4317:4317 -p 4318:4318 \
+  -v "$(pwd)/otel-collector-config.yml:/etc/otelcol/config.yaml:ro" \
+  docker.elastic.co/observability/elastic-otel-collector:latest \
+  --config=/etc/otelcol/config.yaml
+```
+
+This forwards traces received on `localhost:4318` to Phoenix at
+`http://localhost:6006/v1/traces` using the OTLP HTTP exporter.
+
 ## Run the eval
 
 ```bash
