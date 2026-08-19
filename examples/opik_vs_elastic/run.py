@@ -196,9 +196,8 @@ async def main() -> None:
     )
 
     # [IMPORTANT] NOTE: if the dataset doesn't exist, then it creates a new one with the given name. If the dataset already exists,
-    # then it's going to cross-check examples and fully rewrite/update accordingly. Example of a response after sending
-    # the request for the same dataset, but with only the first 5 examples:
-    # UpsertDatasetResponse(dataset_id='0b5ee7b6-9f4a-5c66-b196-6b8cc5154eec', added=0, removed=47, unchanged=5)
+    # then it's going to cross-check examples and fully rewrite/update accordingly: re-running with a smaller sample
+    # removes the examples that are no longer present.
 
     upsert_dataset_response = await elastic_evals_client._datasets_client.upsert(
         name=DATASET_NAME,

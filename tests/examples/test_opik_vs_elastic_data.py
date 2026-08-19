@@ -70,16 +70,25 @@ def test_load_wix_data_normalizes_gcs_ground_truth(monkeypatch: pytest.MonkeyPat
         }
     )
 
+    monkeypatch.setenv(data.WIX_QA_DATASET_PATH_ENV, "gs://test-bucket/wix_qa.csv")
+    monkeypatch.setenv(data.WIX_KNOWLEDGE_BASE_PATH_ENV, "gs://test-bucket/wix_knowledge_base.csv")
     monkeypatch.setattr(
         data.pd,
         "read_csv",
-        lambda path: qa_source if path == data.WIX_QA_DATASET_PATH else knowledge_base_source,
+        lambda path: qa_source if path == "gs://test-bucket/wix_qa.csv" else knowledge_base_source,
     )
 
     qa, knowledge_base = data.load_wix_data(use_gcp=True)
 
     assert qa["relevant_doc_ids"].tolist() == [["doc-1"]]
     assert knowledge_base["id"].tolist() == ["doc-1"]
+
+
+def test_load_wix_data_requires_gcs_paths_when_using_gcp(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(data.WIX_QA_DATASET_PATH_ENV, raising=False)
+
+    with pytest.raises(ValueError, match=data.WIX_QA_DATASET_PATH_ENV):
+        data.load_wix_data(use_gcp=True)
 
 
 def test_select_qa_examples_supports_sample_and_entire_dataset() -> None:

@@ -13,8 +13,6 @@ from collections.abc import Iterable, Mapping
 from typing import Any, cast
 
 from dotenv import load_dotenv
-from orca.evaluation.evaluators.retrieval import F1AtK, PrecisionAtK, RecallAtK  # type: ignore[import-untyped]
-from orca.evaluation.evidence.types import EvaluationEvidence, EvidenceArtifact  # type: ignore[import-untyped]
 
 from elastic_evals.api import (
     Environment,
@@ -305,60 +303,6 @@ async def _resolve_subject(
     )
 
 
-def _orca_evidence(document_ids: list[str]) -> EvaluationEvidence:
-    return EvaluationEvidence(
-        artifacts=[
-            EvidenceArtifact(
-                type="resource_list",
-                data={"resources": [{"reference": {"id": document_id}} for document_id in document_ids]},
-            )
-        ]
-    )
-
-
-def _evaluate_with_orca(
-    executed_runs: list[dict[str, Any]],
-) -> list[tuple[dict[str, Any], EvaluationRun]]:
-    scored: list[tuple[dict[str, Any], EvaluationRun]] = []
-    for executed in executed_runs:
-        run_data = executed["data"]
-        retrieved = _extract_retrieved_doc_ids(run_data.output, tool_id=SEARCH_TOOL_ID)
-        relevant = _to_string_list((run_data.metadata or {}).get("relevant_doc_ids"))
-        evidence = _orca_evidence(retrieved)
-        harness = {
-            "name": "agent_builder_converse",
-            "adapter": "run2_task_output",
-            "locator": None,
-            "metadata": {"trace_id": run_data.trace_id},
-        }
-        for metric in (PrecisionAtK(k=3), RecallAtK(k=3), F1AtK(k=3)):
-            score = metric.score(
-                evidence=evidence.model_dump(mode="json"),
-                harness=harness,
-                relevant_doc_ids=relevant,
-            )
-            if isinstance(score, list):
-                raise TypeError(f"Orca evaluator {metric.name} returned multiple scores")
-            scored.append(
-                _scored_run(
-                    executed,
-                    name=f"orca.{score.name}",
-                    result=EvaluationResult(
-                        score=None if score.scoring_failed else float(score.value),
-                        label="unavailable" if score.scoring_failed else None,
-                        explanation=score.reason,
-                        metadata={
-                            "source": "orca",
-                            "scoring_failed": score.scoring_failed,
-                            "k": 3,
-                        },
-                    ),
-                )
-            )
-    print(f"Orca evaluation complete: scores={len(scored)}")
-    return scored
-
-
 async def main() -> None:
     print("[1] Load configuration and prepare the knowledge base")
     load_dotenv(ENV_PATH)
@@ -597,7 +541,7 @@ async def main() -> None:
     }
     connector_id = config.evaluator_connector_id or config.connector_id
 
-    print("[6] Create the experiment with the initial scores")
+    print("[6] Create the experiment and ingest the scores")
     await _export_scores(
         scores_client,
         export_context,
@@ -611,15 +555,6 @@ async def main() -> None:
         label="Document Recall scores",
         evaluator_model_id="elastic-evals-sdk-python",
         scored_runs=document_recall_scores,
-    )
-
-    print("[7] Run external Orca evaluators and attach their scores")
-    await _export_scores(
-        scores_client,
-        export_context,
-        label="External Orca scores",
-        evaluator_model_id="orca",
-        scored_runs=_evaluate_with_orca(executed_runs),
     )
 
     print(f"Finished.\nExperiment '{EXPERIMENT_NAME}' is ready in Kibana.\nExperiment ID: {experiment_id}")

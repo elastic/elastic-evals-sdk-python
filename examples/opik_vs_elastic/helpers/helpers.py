@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 from typing import Any
 
@@ -14,15 +15,20 @@ ENV_PATH = Path(__file__).parent.parent / ".env"
 INDEX_NAME = "wix_knowledge_base"
 SEARCH_TOOL_ID = "wix-knowledge-search"
 GROUND_TRUTH_COLUMN = "gt_customer_support_wix_knowledge_base"
-WIX_QA_DATASET_PATH = "gs://agent-builder-data-science-datasets/queries/wix_qa.csv"
-WIX_KNOWLEDGE_BASE_PATH = (
-    "gs://agent-builder-data-science-datasets/knowledge_bases/cleaned/"
-    "customer_support/wix_knowledge_base/wix_knowledge_base.csv"
-)
+WIX_QA_DATASET_PATH_ENV = "WIX_QA_DATASET_PATH"
+WIX_KNOWLEDGE_BASE_PATH_ENV = "WIX_KNOWLEDGE_BASE_PATH"
 AGENT_ID = "wix-eval-agent"
 AGENT_NAME = "Wix Agent"
 AGENT_INSTRUCTIONS = "Answer questions using the Wix knowledge base."
 SEARCH_TOOL_DESCRIPTION = "Search the Wix knowledge base articles."
+
+
+def get_dataset_path(variable: str) -> str:
+    """Read a GCS dataset path from the environment. Only needed when USE_GCP is True."""
+    value = os.getenv(variable)
+    if not value:
+        raise ValueError(f"Set {variable} in .env to load the Wix data from GCS, or run with USE_GCP = False.")
+    return value
 
 
 def _parse_relevant_doc_ids(value: Any) -> list[str]:

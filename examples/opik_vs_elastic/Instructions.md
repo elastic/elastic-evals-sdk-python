@@ -4,24 +4,13 @@ This PoC demonstrates how Agent Builder can use the `kbn/evals` Python SDK for d
 management, experiment tracing, and evaluator score ingestion—capabilities previously
 handled through Opik—and how to build custom evaluators.
 
-## 1. Dependencies
-
-`run2.py` uses external Orca evaluators. Clone the `orca` repo as a sibling of
-`elastic-evals-sdk-python/` so the layout is:
-
-```
-── elastic-evals-sdk-python/
-── orca/
-```
-
-## 2. Python environment
+## 1. Python environment
 
 From the SDK repo root:
 
 ```bash
 uv sync --group dev --extra runner --extra poc
 source .venv/bin/activate
-uv pip install --editable ../orca
 ```
 
 Register the venv as a Jupyter kernel. Only needed if your notebook/IDE doesn't pick up `.venv` automatically:
@@ -30,7 +19,7 @@ Register the venv as a Jupyter kernel. Only needed if your notebook/IDE doesn't 
 uv run --no-sync python -m ipykernel install --user --name elastic-evals-poc
 ```
 
-## 3. Secrets
+## 2. Secrets
 
 Create `.env` next to `.env.example`:
 
@@ -39,9 +28,8 @@ cp examples/opik_vs_elastic/.env.example examples/opik_vs_elastic/.env
 ```
 
 Set the local URLs, `ELASTICSEARCH_API_KEY`, `KIBANA_API_KEY`, `CONNECTOR_ID`,
-and `EVALUATION_CONNECTOR_ID`. The Opik variables are used when `run2.py` runs
-the tracked external Orca evaluators. Retrieve internal credentials from Vault
-when needed:
+and `EVALUATION_CONNECTOR_ID`. Retrieve internal credentials from Vault when
+needed:
 
 ```bash
 VAULT_ADDR=https://secrets.elastic.co:8200 vault login --method oidc
@@ -49,9 +37,9 @@ VAULT_ADDR=https://secrets.elastic.co:8200 vault login --method oidc
 
 The public Hugging Face dataset does not require an API key.
 
-## 4. Data source and sample size
+## 3. Data source and sample size
 
-Set these values near the top of the script before running it:
+Set these values near the top of the script you're running:
 
 ```python
 USE_ENTIRE_DATASET = False
@@ -65,9 +53,9 @@ files. `DATASET_SAMPLE_SIZE` is ignored when `USE_ENTIRE_DATASET` is `True`.
 The entire knowledge base is always indexed.
 
 The available examples and their order may differ between Hugging Face and GCS.
-`run.py` defaults to 10 examples and `run2.py` defaults to 3.
+Both scripts default to 10 examples.
 
-## 5. GCP access
+## 4. GCP access
 
 Only needed when `USE_GCP = True`. Authenticate with your `@elastic.co` account:
 
@@ -75,9 +63,20 @@ Only needed when `USE_GCP = True`. Authenticate with your `@elastic.co` account:
 gcloud auth application-default login
 ```
 
-## 6. Local stack
+## 5. Local stack
 
-Use a separate terminal for each service and leave it running.
+The steps below run from a local Kibana checkout. If you don't have one already,
+clone [elastic/kibana](https://github.com/elastic/kibana) and bootstrap it:
+
+```bash
+git clone https://github.com/elastic/kibana.git
+cd kibana
+nvm use
+yarn kbn bootstrap
+```
+
+Run the remaining commands from that `kibana` directory, using a separate
+terminal for each service and leaving it running.
 
 In `kibana/config/kibana.dev.yml`, enable evals and OTLP tracing:
 
@@ -100,7 +99,6 @@ uiSettings:
 ### Elasticsearch
 
 ```bash
-cd /Users/mafaldasavelho/Documents/work-repos/kibana-fork/kibana
 nvm use
 yarn es snapshot --license trial
 ```
@@ -118,7 +116,6 @@ curl --user elastic:changeme \
 Start Docker Desktop, then run:
 
 ```bash
-cd /Users/mafaldasavelho/Documents/work-repos/kibana-fork/kibana
 nvm use
 node scripts/edot_collector.js
 ```
@@ -134,7 +131,6 @@ docker ps \
 ### Kibana
 
 ```bash
-cd /Users/mafaldasavelho/Documents/work-repos/kibana-fork/kibana
 nvm use
 node scripts/kibana --dev --verbose
 ```
@@ -149,7 +145,7 @@ curl --silent --show-error \
   http://localhost:5601/dev/api/status
 ```
 
-## 7. Elasticsearch API key
+## 6. Elasticsearch API key
 
 Both scripts authenticate to Elasticsearch and Kibana. Create an API key against
 the local cluster and paste the `encoded` field into both
@@ -164,7 +160,9 @@ This step is optional if both variables already contain a valid key for the
 current cluster. API keys are cluster-specific, so a key from a previous local
 Elasticsearch snapshot returns `401`.
 
-## 8. Run the PoC
+## 7. Run the PoC
+
+Run both scripts from the SDK repo root.
 
 ### `run.py`: managed workflow
 
@@ -173,15 +171,14 @@ Demonstrates the higher-level workflow. It uses
 run SDK-side and custom evaluators, and ingest their scores.
 
 ```bash
-cd /Users/mafaldasavelho/Documents/work-repos/kibana-fork/evals-python-sdk/elastic-evals-sdk-python
 uv run --no-sync python -m examples.opik_vs_elastic.run
 ```
 
 ### `run2.py`: granular workflow
 
 Demonstrates the lower-level workflow without `run_experiment()`. It directly
-coordinates the Dataset, Evaluators, and Score Ingestion APIs, runs the custom
-Document Recall evaluator, and attaches external Orca scores.
+coordinates the Dataset, Evaluators, and Score Ingestion APIs, and runs the
+custom Document Recall evaluator alongside the Kibana ones.
 
 ```bash
 uv run --no-sync python -m examples.opik_vs_elastic.run2

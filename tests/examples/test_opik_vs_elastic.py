@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 pytest.importorskip("pandas")
-pytest.importorskip("orca")
 
 from elastic_evals.api import (  # noqa: E402
     Environment,
@@ -239,25 +238,6 @@ def test_granular_score_request_preserves_experiment_name_and_batches_scores() -
     assert [score.evaluator.name for score in payload.scores] == ["score-a", "score-b"]
     assert all(score.example.id == "example-1" for score in payload.scores)
     assert all(score.task.trace_id == "1" * 32 for score in payload.scores)
-
-
-def test_granular_orca_scores_are_namespaced_and_use_stored_run() -> None:
-    scored_runs = granular_run._evaluate_with_orca([_executed_run()])
-
-    assert [evaluation.name for _, evaluation in scored_runs] == [
-        "orca.precision-at-3",
-        "orca.recall-at-3",
-        "orca.f1-at-3",
-    ]
-    assert [evaluation.result.score for _, evaluation in scored_runs if evaluation.result] == [
-        pytest.approx(1 / 3),
-        pytest.approx(1 / 2),
-        pytest.approx(0.4),
-    ]
-    assert all(
-        evaluation.result and evaluation.result.metadata and evaluation.result.metadata["source"] == "orca"
-        for _, evaluation in scored_runs
-    )
 
 
 def test_granular_evaluator_configs_use_reference_data_and_llm_connector() -> None:

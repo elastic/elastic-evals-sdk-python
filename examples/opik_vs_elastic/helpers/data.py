@@ -14,9 +14,10 @@ from datasets import load_dataset
 
 from examples.opik_vs_elastic.helpers.helpers import (
     GROUND_TRUTH_COLUMN,
-    WIX_KNOWLEDGE_BASE_PATH,
-    WIX_QA_DATASET_PATH,
+    WIX_KNOWLEDGE_BASE_PATH_ENV,
+    WIX_QA_DATASET_PATH_ENV,
     _parse_relevant_doc_ids,  # noqa: PLC2701
+    get_dataset_path,
 )
 
 HUGGING_FACE_DATASET = "Wix/WixQA"
@@ -85,9 +86,9 @@ def _normalize_knowledge_base(dataframe: pd.DataFrame, *, source: str) -> pd.Dat
 def load_wix_data(*, use_gcp: bool) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load WixQA examples and their knowledge-base corpus."""
     if use_gcp:
-        qa = _normalize_gcs_qa(pd.read_csv(WIX_QA_DATASET_PATH))
+        qa = _normalize_gcs_qa(pd.read_csv(get_dataset_path(WIX_QA_DATASET_PATH_ENV)))
         knowledge_base = _normalize_knowledge_base(
-            pd.read_csv(WIX_KNOWLEDGE_BASE_PATH),
+            pd.read_csv(get_dataset_path(WIX_KNOWLEDGE_BASE_PATH_ENV)),
             source="GCS Wix knowledge base",
         )
     else:
