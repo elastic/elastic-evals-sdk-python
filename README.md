@@ -22,6 +22,18 @@ This package is not yet published to PyPI. Install directly from GitHub:
 
 ### Using uv (recommended)
 
+Existing environment (Colab, notebooks, a venv that already exists)
+
+```bash
+# Core SDK
+uv pip install "git+https://github.com/elastic/elastic-evals-sdk-python.git"
+
+# SDK + CLI runner
+uv pip install "elastic-evals[runner] @ git+https://github.com/elastic/elastic-evals-sdk-python.git"
+```
+
+For uv project (a directory that already has pyproject.toml):
+
 ```bash
 # Core SDK
 uv add "git+https://github.com/elastic/elastic-evals-sdk-python.git"
