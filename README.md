@@ -22,7 +22,7 @@ This package is not yet published to PyPI. Install directly from GitHub:
 
 ### Using uv (recommended)
 
-Existing environment (Colab, notebooks, a venv that already exists)
+Existing environment (notebooks, a venv that already exists):
 
 ```bash
 # Core SDK
@@ -32,7 +32,13 @@ uv pip install "git+https://github.com/elastic/elastic-evals-sdk-python.git"
 uv pip install "elastic-evals[runner] @ git+https://github.com/elastic/elastic-evals-sdk-python.git"
 ```
 
-For uv project (a directory that already has pyproject.toml):
+Google Colab (caps OpenTelemetry so it stays compatible with preinstalled `google-adk`):
+
+```bash
+uv pip install "elastic-evals[colab] @ git+https://github.com/elastic/elastic-evals-sdk-python.git"
+```
+
+For a uv project (a directory that already has pyproject.toml):
 
 ```bash
 # Core SDK
@@ -50,6 +56,9 @@ pip install "git+https://github.com/elastic/elastic-evals-sdk-python.git"
 
 # SDK + CLI runner
 pip install "elastic-evals[runner] @ git+https://github.com/elastic/elastic-evals-sdk-python.git"
+
+# Google Colab
+pip install "elastic-evals[colab] @ git+https://github.com/elastic/elastic-evals-sdk-python.git"
 ```
 
 ### From source
