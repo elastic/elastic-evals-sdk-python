@@ -2266,7 +2266,7 @@ wheels = [
 
 [[package]]
 name = "opik"
-version = "2.1.32"
+version = "2.2.35"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3-stubs", extra = ["bedrock-runtime"] },
@@ -2289,9 +2289,9 @@ dependencies = [
     { name = "uuid6" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/0a/2e3106bcca674f6a096848035999e9421f3a558b46f06310e25108336891/opik-2.1.32.tar.gz", hash = "sha256:0272c734608c03710b3f3dce2c5727dcfb97ee517ef8c690946db13d26b3ada4", size = 1176998, upload-time = "2026-07-17T08:07:13.383Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/7f/b55878d3e19e1d15c81c71e0d909d18b717f771c5c6d1a9be5842c69a344/opik-2.2.35.tar.gz", hash = "sha256:4a8c3f9ad47248046f4c1bab04ab9a957caa8ee7da0d7fed005899337dfe8ef8", size = 1219778, upload-time = "2026-08-20T17:34:09.302Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/52/3a4996eb91df6291e4c0cc575816d5e984e474eb7b87ca22a8063bcf5322/opik-2.1.32-py3-none-any.whl", hash = "sha256:ef2867d5d343884e30aa16b0005db3088472c49313c1d0506907a0a1c366b252", size = 1865089, upload-time = "2026-07-17T08:07:10.878Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/b6/d6efbc8a4eae8e9b0bcf563f30848453ecce37d986d351f2ebb79956705c/opik-2.2.35-py3-none-any.whl", hash = "sha256:81f7364b38f29c50bd31b79c24332da3af6ff63311e6463397341a45f7c812ce", size = 1913145, upload-time = "2026-08-20T17:34:07.233Z" },
 ]
 
 [[package]]
@@ -2387,7 +2387,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
