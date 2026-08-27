@@ -29,14 +29,16 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.11"
+          activate-environment: true
+          cache-suffix: lowest-direct
 
       - name: Install runtime deps at lowest direct versions
         run: |
-          uv pip install . --resolution lowest-direct --system
-          uv pip install pytest pytest-asyncio --system
+          uv pip install . --resolution lowest-direct
+          uv pip install pytest pytest-asyncio
 
       - name: Show installed versions
-        run: uv pip list --system | grep -iE 'pydantic|rich|opentelemetry|httpx|tenacity|aiohttp'
+        run: uv pip list | grep -iE 'pydantic|rich|opentelemetry|httpx|tenacity|aiohttp'
 
       - name: Run tests
         run: python -m pytest tests/
