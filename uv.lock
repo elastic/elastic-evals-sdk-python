@@ -3,19 +3,19 @@ revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -2224,10 +2224,10 @@ version = "2.5.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
@@ -2447,7 +2447,7 @@ wheels = [
 
 [[package]]
 name = "opik"
-version = "2.2.36"
+version = "2.2.39"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3-stubs", extra = ["bedrock-runtime"] },
@@ -2470,9 +2470,9 @@ dependencies = [
     { name = "uuid6" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/5b/e53fcd3da189449bc8fe6163f7452f0a4344e8efe0a3d4ad5d6f074b2fc6/opik-2.2.36.tar.gz", hash = "sha256:27676ce588e3684321f9de900ea23e37d9c4a67835efe1e745d2977bc19ef324", size = 1220290, upload-time = "2026-08-21T12:00:12.094Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/2c/9b30e576fead4cbb45cac2d3a8a8fc0ff8901514a1aaa5b5714ceb2003ed/opik-2.2.39.tar.gz", hash = "sha256:371a70ccb9a527c756ce46070804729995d51c6dd2bfddce6ff3692a31d53617", size = 1220959, upload-time = "2026-08-24T14:31:28.875Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e2/c2/bf5db148bf248da509564769131b4fdb4561dd5d2548f0a1a805436d725d/opik-2.2.36-py3-none-any.whl", hash = "sha256:59d45b112ab724c30487d575aef365f05a6d93e57dea6b164fb5e9bb86628ab5", size = 1913870, upload-time = "2026-08-21T12:00:09.3Z" },
+    { url = "https://files.pythonhosted.org/packages/08/17/655efa760be9a421d171bb3b16ffaca8f9ad1d05e64a24b888b6e43b78b7/opik-2.2.39-py3-none-any.whl", hash = "sha256:3fbbab688e086a539b15b782d98e728c25321bb3671259ae3e39836f7c8fe044", size = 1914429, upload-time = "2026-08-24T14:31:27.048Z" },
 ]
 
 [[package]]
