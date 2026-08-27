@@ -1,0 +1,44 @@
+name: Minimum version tests
+
+on:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/min-versions.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/min-versions.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test_min_versions:
+    name: Test minimum dependency versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.11"
+          activate-environment: true
+          cache-suffix: lowest-direct
+
+      - name: Install runtime deps at lowest direct versions
+        run: |
+          uv pip install . --resolution lowest-direct
+          uv pip install pytest pytest-asyncio
+
+      - name: Show installed versions
+        run: uv pip list | grep -iE 'pydantic|rich|opentelemetry|httpx|tenacity|aiohttp'
+
+      - name: Run tests
+        run: python -m pytest tests/
