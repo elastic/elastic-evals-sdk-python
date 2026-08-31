@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import uuid
 from collections.abc import Sequence
 from typing import Any
@@ -213,7 +214,6 @@ def test_dataset_id_non_default_space_differs_from_default() -> None:
 
 
 def test_dataset_id_non_default_space_matches_kibana_formula() -> None:
-    import json as _json
 
     # Mirrors kbn-evals-common: uuidv5(JSON.stringify([spaceId, name]), NAMESPACE)
     expected = str(uuid.uuid5(DATASET_UUID_NAMESPACE, _json.dumps(["my-space", "foo"], separators=(",", ":"))))
