@@ -200,3 +200,36 @@ async def test_get_503_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) ->
 def test_dataset_id_matches_uuid5_namespace() -> None:
     expected = str(uuid.uuid5(DATASET_UUID_NAMESPACE, "foo"))
     assert compute_dataset_id("foo") == expected
+
+
+def test_dataset_id_default_space_explicit_matches_implicit() -> None:
+    assert compute_dataset_id("foo", "default") == compute_dataset_id("foo")
+
+
+def test_dataset_id_non_default_space_differs_from_default() -> None:
+    default_id = compute_dataset_id("foo")
+    space_id = compute_dataset_id("foo", "my-space")
+    assert default_id != space_id
+
+
+def test_dataset_id_non_default_space_matches_kibana_formula() -> None:
+    import json as _json
+
+    # Mirrors kbn-evals-common: uuidv5(JSON.stringify([spaceId, name]), NAMESPACE)
+    expected = str(uuid.uuid5(DATASET_UUID_NAMESPACE, _json.dumps(["my-space", "foo"], separators=(",", ":"))))
+    assert compute_dataset_id("foo", "my-space") == expected
+
+
+@pytest.mark.parametrize(
+    "url, expected_space",
+    [
+        ("http://localhost:5601", "default"),
+        ("http://localhost:5601/", "default"),
+        ("https://host/s/my-space", "my-space"),
+        ("https://host/s/my-space/", "my-space"),
+        ("http://kibana:5601/s/staging", "staging"),
+    ],
+)
+def test_kibana_datasets_client_extracts_space_from_url(url: str, expected_space: str) -> None:
+    client = KibanaDatasetsClient(url)
+    assert client.space_id == expected_space

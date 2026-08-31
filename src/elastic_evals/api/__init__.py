@@ -6,6 +6,7 @@
 
 from elastic_evals.api.constants import (
     DATASET_UUID_NAMESPACE,
+    DEFAULT_SPACE_ID,
     EVALS_API_VERSION,
     EVALS_DATASET_UPSERT_URL,
     EVALS_DATASET_URL,
@@ -89,6 +90,7 @@ __all__ = [
     "BuildkiteMetadata",
     "Ci",
     "DATASET_UUID_NAMESPACE",
+    "DEFAULT_SPACE_ID",
     "Dataset",
     "DatasetExample",
     "KibanaDatasetsClient",
