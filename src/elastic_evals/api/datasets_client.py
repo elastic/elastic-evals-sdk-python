@@ -6,12 +6,16 @@
 
 from __future__ import annotations
 
+import json
+import re
 import uuid
+from urllib.parse import urlparse
 
 import httpx
 
 from elastic_evals.api.constants import (
     DATASET_UUID_NAMESPACE,
+    DEFAULT_SPACE_ID,
     EVALS_DATASET_UPSERT_URL,
     EVALS_DATASET_URL,
 )
@@ -26,9 +30,18 @@ from elastic_evals.api.response import raise_kibana_error
 from elastic_evals.api.retry import retry_kibana_api_call
 
 
-def compute_dataset_id(name: str) -> str:
-    """Compute Kibana dataset ID from dataset name."""
-    return str(uuid.uuid5(DATASET_UUID_NAMESPACE, name))
+def _extract_space_id(kibana_url: str) -> str:
+    path = urlparse(kibana_url).path
+    match = re.match(r"^/s/([^/]+)", path)
+    return match.group(1) if match else DEFAULT_SPACE_ID
+
+
+def compute_dataset_id(name: str, space_id: str = DEFAULT_SPACE_ID) -> str:
+    """Compute Kibana dataset ID from dataset name and Kibana space."""
+    if space_id == DEFAULT_SPACE_ID:
+        return str(uuid.uuid5(DATASET_UUID_NAMESPACE, name))
+    serialized = json.dumps([space_id, name], separators=(",", ":"))
+    return str(uuid.uuid5(DATASET_UUID_NAMESPACE, serialized))
 
 
 class KibanaDatasetsClient:
@@ -41,6 +54,7 @@ class KibanaDatasetsClient:
         self.kibana_url = kibana_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+        self.space_id = _extract_space_id(self.kibana_url)
 
     @retry_kibana_api_call
     async def upsert(

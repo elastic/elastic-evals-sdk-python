@@ -101,7 +101,7 @@ class ElasticEvalsClient:
     ) -> RanExperiment:
         run_concurrency = max(1, concurrency or self.config.concurrency)
         semaphore = asyncio.Semaphore(run_concurrency)
-        dataset_id = compute_dataset_id(dataset.name)
+        dataset_id = compute_dataset_id(dataset.name, self._datasets_client.space_id)
         experiment_id = str(uuid.uuid4())
         repetitions = self.config.repetitions
         task_model = self._build_task_model()
