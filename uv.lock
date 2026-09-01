@@ -565,14 +565,11 @@ wheels = [
 
 [[package]]
 name = "click"
-version = "8.4.2"
+version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/0e/7fa0ef50764b67090eca4114772a2abf8b6148198475e54c660b97caeee6/click-8.5.0.tar.gz", hash = "sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34", size = 382235, upload-time = "2026-08-26T13:33:14.56Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/e2/79c688af8b210d232694e31e59da9f6ec747bae31c3f5946e4e9b98860d5/click-8.4.2-py3-none-any.whl", hash = "sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76", size = 119243, upload-time = "2026-06-24T17:45:13.73Z" },
+    { url = "https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl", hash = "sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360", size = 125251, upload-time = "2026-08-26T13:33:12.928Z" },
 ]
 
 [[package]]
@@ -2447,7 +2444,7 @@ wheels = [
 
 [[package]]
 name = "opik"
-version = "2.2.39"
+version = "2.2.43"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3-stubs", extra = ["bedrock-runtime"] },
@@ -2470,9 +2467,9 @@ dependencies = [
     { name = "uuid6" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/90/2c/9b30e576fead4cbb45cac2d3a8a8fc0ff8901514a1aaa5b5714ceb2003ed/opik-2.2.39.tar.gz", hash = "sha256:371a70ccb9a527c756ce46070804729995d51c6dd2bfddce6ff3692a31d53617", size = 1220959, upload-time = "2026-08-24T14:31:28.875Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/22/4e7930a90b77f2afb61afde17995f9b443fed39a27f1b158c750115bea33/opik-2.2.43.tar.gz", hash = "sha256:84b51a833709b2ed73a9128b667ea991f0771d29e0c16b4ef2fbdd7992071a88", size = 1236606, upload-time = "2026-08-27T14:57:15.372Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/17/655efa760be9a421d171bb3b16ffaca8f9ad1d05e64a24b888b6e43b78b7/opik-2.2.39-py3-none-any.whl", hash = "sha256:3fbbab688e086a539b15b782d98e728c25321bb3671259ae3e39836f7c8fe044", size = 1914429, upload-time = "2026-08-24T14:31:27.048Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/72/15e41d96547a1065baf88807abaa532c80aa35c080b25fee5f1274fc77e0/opik-2.2.43-py3-none-any.whl", hash = "sha256:e0d327802ada8fb6f91c573e198a4a566180386e0e3005d4e2284c4fe2354531", size = 1937064, upload-time = "2026-08-27T14:57:12.498Z" },
 ]
 
 [[package]]
