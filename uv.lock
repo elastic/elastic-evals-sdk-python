@@ -2444,7 +2444,7 @@ wheels = [
 
 [[package]]
 name = "opik"
-version = "2.2.43"
+version = "2.2.49"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3-stubs", extra = ["bedrock-runtime"] },
@@ -2467,9 +2467,9 @@ dependencies = [
     { name = "uuid6" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/22/4e7930a90b77f2afb61afde17995f9b443fed39a27f1b158c750115bea33/opik-2.2.43.tar.gz", hash = "sha256:84b51a833709b2ed73a9128b667ea991f0771d29e0c16b4ef2fbdd7992071a88", size = 1236606, upload-time = "2026-08-27T14:57:15.372Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/36/4e90963141e91463f04465a97930d3cccc24ddf205f8bf5e9cc10a9671f6/opik-2.2.49.tar.gz", hash = "sha256:493fe70b5a21d9ff2225ca26c08df8d83fa738c64dd2bc2624072670c03609f4", size = 1273490, upload-time = "2026-09-03T09:25:39.448Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/72/15e41d96547a1065baf88807abaa532c80aa35c080b25fee5f1274fc77e0/opik-2.2.43-py3-none-any.whl", hash = "sha256:e0d327802ada8fb6f91c573e198a4a566180386e0e3005d4e2284c4fe2354531", size = 1937064, upload-time = "2026-08-27T14:57:12.498Z" },
+    { url = "https://files.pythonhosted.org/packages/95/48/faf215cf3c4a436d0a7a873a0c1dda33dcfeace83656203c337c6bd40b51/opik-2.2.49-py3-none-any.whl", hash = "sha256:eaa54fcbab66950d38edb68e2d5e29c08b4d864f607260e7db5e32108bb80743", size = 1980505, upload-time = "2026-09-03T09:25:37.397Z" },
 ]
 
 [[package]]
