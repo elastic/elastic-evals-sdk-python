@@ -4,6 +4,7 @@
 
 """Dataset stores: where the runner gets its examples and their ids from."""
 
+from .kibana import KibanaDatasetStore
 from .memory import InMemoryDatasetStore
 
-__all__ = ["InMemoryDatasetStore"]
+__all__ = ["InMemoryDatasetStore", "KibanaDatasetStore"]
