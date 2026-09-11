@@ -18,13 +18,6 @@ from elastic_evals.tracing import TracingConfig
 from elastic_evals.utils.logging import setup_logging
 
 
-def _get_required_env(name: str) -> str:
-    value = os.environ.get(name)
-    if value is None or value == "":
-        raise KeyError(f'Missing required env var "{name}"')
-    return value
-
-
 def _parse_int(value: str, *, name: str) -> int:
     try:
         return int(value)
@@ -50,7 +43,7 @@ class ElasticEvalsConfig(BaseModel):
 
     kibana_url: str = "http://localhost:5601"
     kibana_api_key: str | None = None
-    connector_id: str
+    connector_id: str | None = None
     evaluator_connector_id: str | None = None
 
     elasticsearch_url: str | None = None
@@ -74,7 +67,7 @@ class ElasticEvalsConfig(BaseModel):
         concurrency = _parse_int(os.environ.get("ELASTIC_EVALS_CONCURRENCY", "5"), name="concurrency")
         kibana_url = os.environ.get("KIBANA_URL", "http://localhost:5601")
         kibana_api_key = os.environ.get("KIBANA_API_KEY")
-        connector_id = _get_required_env("CONNECTOR_ID")
+        connector_id = os.environ.get("CONNECTOR_ID") or None
         evaluator_connector_id = os.environ.get("EVALUATION_CONNECTOR_ID")
         elasticsearch_url = os.environ.get("ELASTICSEARCH_URL")
         elasticsearch_api_key = os.environ.get("ELASTICSEARCH_API_KEY")
