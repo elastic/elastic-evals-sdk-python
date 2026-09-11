@@ -71,14 +71,10 @@ uv sync
 
 ## Quick start
 
-Set required environment variables:
+### Run locally, no Kibana needed
 
-```bash
-export CONNECTOR_ID="your-connector-id"
-export KIBANA_URL="http://elastic:changeme@localhost:5620"
-```
-
-Minimal example with a custom evaluator:
+The fastest way to try the SDK is a fully in-memory run. Examples stay in memory,
+scores are collected in a list, and no connector or Kibana credentials are required:
 
 ```python
 import asyncio
@@ -91,9 +87,7 @@ from elastic_evals.types import EvaluationDataset, EvaluationResult, EvaluatorPa
 dataset = EvaluationDataset(
     name="example-eval",
     description="Quick start example",
-    examples=[
-        Example(input={"question": "What is 2 + 2?"}, output={"expected": "4"}),
-    ],
+    examples=[Example(input={"question": "What is 2 + 2?"}, output={"expected": "4"})],
 )
 
 async def task(example: Example) -> dict:
@@ -105,6 +99,35 @@ async def evaluator(params: EvaluatorParams) -> EvaluationResult:
     return EvaluationResult(score=1.0 if answer == expected else 0.0)
 
 async def main() -> None:
+    client = ElasticEvalsClient.local(ElasticEvalsConfig())
+    result = await client.run_experiment(
+        dataset=dataset,
+        task=task,
+        evaluators=[SimpleEvaluator(name="ExactMatch", kind="CODE", evaluate=evaluator)],
+    )
+    for run in result.evaluation_runs:
+        print(run.name, run.result.score if run.result else None)
+
+asyncio.run(main())
+```
+
+Each finished example is also available on `client.score_sink.results`, including the
+task output and every evaluator result for that example.
+
+### Run against Kibana
+
+To persist datasets and scores in Kibana, point the config at your deployment. A connector
+is only needed for LLM evaluators:
+
+```bash
+export KIBANA_URL="http://elastic:changeme@localhost:5620"
+export CONNECTOR_ID="your-connector-id"   # only for LLM-as-judge evaluators
+```
+
+The same code as above, with the default client instead of `local()`:
+
+```python
+async def main() -> None:
     config = ElasticEvalsConfig.from_env()
     client = ElasticEvalsClient(config)
     result = await client.run_experiment(
@@ -113,17 +136,22 @@ async def main() -> None:
         evaluators=[SimpleEvaluator(name="ExactMatch", kind="CODE", evaluate=evaluator)],
     )
     print(f"Finished experiment {result.id} with {len(result.evaluation_runs)} runs")
-
-asyncio.run(main())
 ```
+
+Both clients run the same loop. They differ only in where examples come from and where
+scores go: `ElasticEvalsClient(config)` uses Kibana for both, `ElasticEvalsClient.local(config)`
+uses in-memory implementations. You can also mix them by passing your own `dataset_store=`
+or `score_sink=` to the constructor; see `DatasetStore` and `ScoreSink` in `elastic_evals.types`.
 
 ## Core concepts
 
 ### Dataset
 
 An `EvaluationDataset` is a collection of `Example` items with input, expected output,
-and optional metadata. Before each run, the dataset is upserted to Kibana and refreshed
-from Kibana's canonical dataset examples.
+and optional metadata. With the default Kibana client, the dataset is upserted to Kibana
+before each run as a full replacement and refreshed from Kibana's canonical examples, so
+example ids come from the server. With `ElasticEvalsClient.local()`, examples are used as-is
+and ids are derived from the dataset name and example position.
 
 ### Task
 
@@ -150,7 +178,7 @@ Results are stored in `RanExperiment`.
 | ------------------------------------ | -------------------------------------------------------- | -------- | --------------------------------- |
 | `KIBANA_URL`                         | Kibana base URL                                          | No       | `http://localhost:5601`           |
 | `KIBANA_API_KEY`                     | API key with `evals` plugin privilege for secured Kibana | No       | -                                 |
-| `CONNECTOR_ID`                       | Kibana connector ID for tasks                            | Yes      | -                                 |
+| `CONNECTOR_ID`                       | Kibana connector ID for tasks and LLM evaluators         | No       | -                                 |
 | `EVALUATION_CONNECTOR_ID`            | Connector ID for evaluator LLMs                          | No       | -                                 |
 | `ELASTICSEARCH_URL`                  | Elasticsearch URL for trace lookup                       | No       | -                                 |
 | `ELASTICSEARCH_API_KEY`              | API key for Elasticsearch trace lookup                   | No       | -                                 |

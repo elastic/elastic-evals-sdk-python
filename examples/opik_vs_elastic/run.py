@@ -10,6 +10,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from elastic_evals.api.datasets_client import KibanaDatasetsClient
 from elastic_evals.api.datasets_models import UpsertDatasetExamplePayload
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.base import SimpleEvaluator
@@ -199,7 +200,10 @@ async def main() -> None:
     # then it's going to cross-check examples and fully rewrite/update accordingly: re-running with a smaller sample
     # removes the examples that are no longer present.
 
-    upsert_dataset_response = await elastic_evals_client._datasets_client.upsert(
+    # The runner uploads datasets itself via its DatasetStore; this script talks to the
+    # dataset API directly only to print the upsert summary before the experiment runs.
+    datasets_client = KibanaDatasetsClient(kibana_url=config.kibana_url, api_key=config.kibana_api_key)
+    upsert_dataset_response = await datasets_client.upsert(
         name=DATASET_NAME,
         description=DATASET_DESCRIPTION,
         examples=examples,
@@ -209,9 +213,7 @@ async def main() -> None:
     )
 
     print("Sanity check through direct retrieval of the dataset just created...")
-    get_dataset_response = await elastic_evals_client._datasets_client.get(
-        dataset_id=upsert_dataset_response.dataset_id
-    )
+    get_dataset_response = await datasets_client.get(dataset_id=upsert_dataset_response.dataset_id)
     print(f"Retrieved dataset: {get_dataset_response.name} with {len(get_dataset_response.examples)} examples")
 
     # NOTE: as an alternative, I can call .run_experiment() directly and pass the dataset, which is going to be uploaded.

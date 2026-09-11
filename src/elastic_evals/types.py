@@ -37,9 +37,11 @@ class ExampleWithId(Example[TInput, TExpected, TMetadata], Generic[TInput, TExpe
 class EvaluationDataset(BaseModel, Generic[TExample]):
     """User-provided dataset definition used by the runner.
 
-    During `run_experiment`, examples are upserted and re-fetched from Kibana, then the
-    task callable receives those upstream JSON-shaped examples (including server ids)
-    rather than the original in-memory Pydantic instances.
+    During `run_experiment`, the client's `DatasetStore` turns this into `ExampleWithId`
+    instances and the task callable receives those. With the default Kibana store the
+    examples are upserted and re-fetched, so ids come from the server and only dict-shaped
+    `output`/`metadata` survive. With `InMemoryDatasetStore` the examples pass through
+    unchanged and ids are derived from the dataset name and position.
     """
 
     name: str
