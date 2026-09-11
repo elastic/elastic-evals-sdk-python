@@ -110,7 +110,55 @@ class RanExperiment(BaseModel):
     experiment_metadata: dict[str, Any] | None = None
 
 
+@dataclass(frozen=True)
+class RunContext:
+    """Run-level facts shared by every example result of one `run_experiment` call."""
+
+    run_id: str
+    experiment_id: str
+    experiment_name: str | None
+    suite_id: str | None
+    dataset_id: str
+    dataset_name: str
+    repetitions: int
+    hostname: str
+    model: dict[str, Any] | None = None
+    connector_id: str | None = None
+    evaluator_connector_id: str | None = None
+    git_branch: str | None = None
+    git_commit_sha: str | None = None
+
+
+@dataclass(frozen=True)
+class ExampleResult:
+    """Everything produced for one (example, repetition): the task run and all evaluator runs."""
+
+    context: RunContext
+    example: ExampleWithId
+    example_index: int
+    repetition: int
+    task_run: RunData
+    evaluation_runs: list[EvaluationRun] = field(default_factory=list)
+
+
+class DatasetStore(Protocol):
+    """Turns a user-defined dataset into the examples the task runs on.
+
+    Implementations own example identity: the returned `ExampleWithId` ids are the ones
+    recorded against scores. Extra fields on `Example` subclasses are not preserved.
+    """
+
+    async def resolve(self, dataset: EvaluationDataset) -> list[ExampleWithId]: ...
+
+
+class ScoreSink(Protocol):
+    """Receives one finished (example, repetition) at a time, as soon as it completes."""
+
+    async def write(self, result: ExampleResult) -> None: ...
+
+
 __all__ = [
+    "DatasetStore",
     "EvaluationDataset",
     "EvaluationDatasetWithId",
     "EvaluationResult",
@@ -118,8 +166,11 @@ __all__ = [
     "Evaluator",
     "EvaluatorParams",
     "Example",
+    "ExampleResult",
     "ExampleWithId",
     "RanExperiment",
+    "RunContext",
     "RunData",
+    "ScoreSink",
     "TaskOutput",
 ]

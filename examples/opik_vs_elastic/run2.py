@@ -35,7 +35,7 @@ from elastic_evals.api import (
 from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.export import build_ingest_score_item, get_git_metadata
+from elastic_evals.export import build_ingest_scores_request, get_git_metadata
 from elastic_evals.integrations.agent_builder import (
     AgentBuilderClient,
     AgentConfiguration,
@@ -204,7 +204,7 @@ def _score_request(
     scored_runs: list[tuple[dict[str, Any], EvaluationRun]],
 ) -> IngestScoresRequest | None:
     payloads = [
-        build_ingest_score_item(
+        build_ingest_scores_request(
             run_id=context["config"].run_id,
             experiment_id=context["experiment_id"],
             experiment_name=context["experiment_name"],
@@ -220,7 +220,7 @@ def _score_request(
             example_index=executed["data"].example_index,
             example_input=executed["data"].input,
             task_run=executed["data"],
-            evaluation_run=evaluation,
+            evaluation_runs=[evaluation],
         )
         for executed, evaluation in scored_runs
     ]

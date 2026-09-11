@@ -4,13 +4,59 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from elastic_evals.api import Ci, Environment, Model, RunMetadata
-from elastic_evals.export.documents import build_ingest_score_item
+from elastic_evals.export.documents import build_ingest_scores_request
 from elastic_evals.types import EvaluationResult, EvaluationRun, RunData
 
 
-def test_build_ingest_score_item_matches_scores_contract() -> None:
-    payload = build_ingest_score_item(
+def _common_kwargs() -> dict[str, Any]:
+    return {
+        "run_id": "run-3",
+        "experiment_id": "exp-3",
+        "suite_id": "suite-3",
+        "task_model": Model(id="task-model"),
+        "evaluator_model": Model(id="eval-model"),
+        "run_metadata": RunMetadata(total_repetitions=2, git_branch="main", git_commit_sha="abc123"),
+        "environment": Environment(hostname="worker-3"),
+        "ci": None,
+        "dataset_id": "dataset-3",
+        "dataset_name": "dataset-name-3",
+        "example_id": "example-3",
+        "example_index": 1,
+        "example_input": {"question": "hi"},
+        "task_run": RunData(
+            example_index=1,
+            repetition=0,
+            input={"question": "hi"},
+            expected=None,
+            metadata=None,
+            output={"answer": "hello"},
+            trace_id="task-trace",
+        ),
+        "experiment_name": "batched",
+    }
+
+
+def test_build_ingest_scores_request_puts_all_evaluation_runs_under_one_header() -> None:
+    runs = [
+        EvaluationRun(name="latency", result=EvaluationResult(score=0.5), trace_id="t-1"),
+        EvaluationRun(name="correctness", result=EvaluationResult(score=1.0), trace_id="t-2"),
+    ]
+
+    payload = build_ingest_scores_request(**_common_kwargs(), evaluation_runs=runs)
+    serialized = payload.model_dump(exclude_none=True)
+
+    assert serialized["experiment_id"] == "exp-3"
+    assert serialized["metadata"]["execution_id"] == "run-3"
+    assert [item["evaluator"]["name"] for item in serialized["scores"]] == ["latency", "correctness"]
+    assert [item["evaluator"]["score"] for item in serialized["scores"]] == [0.5, 1.0]
+    assert {item["example"]["id"] for item in serialized["scores"]} == {"example-3"}
+
+
+def test_build_ingest_scores_request_matches_scores_contract() -> None:
+    payload = build_ingest_scores_request(
         run_id="run-1",
         experiment_id="exp-1",
         suite_id="suite-1",
@@ -37,16 +83,18 @@ def test_build_ingest_score_item_matches_scores_contract() -> None:
             output={"answer": {"text": "world", "citations": ["doc-1"]}},
             trace_id="task-trace",
         ),
-        evaluation_run=EvaluationRun(
-            name="correctness",
-            result=EvaluationResult(
-                score=0.9,
-                label="pass",
-                explanation="matches expected output",
-                metadata={"reasoning": "close match"},
-            ),
-            trace_id="eval-trace",
-        ),
+        evaluation_runs=[
+            EvaluationRun(
+                name="correctness",
+                result=EvaluationResult(
+                    score=0.9,
+                    label="pass",
+                    explanation="matches expected output",
+                    metadata={"reasoning": "close match"},
+                ),
+                trace_id="eval-trace",
+            )
+        ],
         experiment_name="named experiment",
     )
 
@@ -88,8 +136,8 @@ def test_build_ingest_score_item_matches_scores_contract() -> None:
     }
 
 
-def test_build_ingest_score_item_omits_evaluator_none_fields() -> None:
-    payload = build_ingest_score_item(
+def test_build_ingest_scores_request_omits_evaluator_none_fields() -> None:
+    payload = build_ingest_scores_request(
         run_id="run-2",
         experiment_id="exp-2",
         suite_id=None,
@@ -112,7 +160,7 @@ def test_build_ingest_score_item_omits_evaluator_none_fields() -> None:
             output={"nested": {"result": [1, 2, 3]}},
             trace_id=None,
         ),
-        evaluation_run=EvaluationRun(name="groundedness", result=None, trace_id=None),
+        evaluation_runs=[EvaluationRun(name="groundedness", result=None, trace_id=None)],
     )
 
     serialized = payload.model_dump(exclude_none=True)
