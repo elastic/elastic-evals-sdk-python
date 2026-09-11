@@ -179,7 +179,13 @@ def fake_kibana(
 @pytest.mark.asyncio
 async def test_runner_end_to_end(
     fake_kibana: dict[str, list[dict[str, Any]]],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    results_url_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "elastic_evals.executor.client.log_results_url",
+        lambda url, run_id: results_url_calls.append((url, run_id)),
+    )
     dataset: EvaluationDataset[Example[dict[str, str], None, None]] = EvaluationDataset(
         name="tiny",
         description="tiny dataset",
@@ -229,6 +235,7 @@ async def test_runner_end_to_end(
     assert seen_task_inputs == [{"q": "ONE-UPSTREAM"}, {"q": "TWO-UPSTREAM"}]
     assert seen_eval_inputs == [{"q": "ONE-UPSTREAM"}, {"q": "TWO-UPSTREAM"}]
     assert seen_eval_trace_ids == ["1" * 32, "2" * 32]
+    assert results_url_calls == [("http://kibana:5601", "run-123")]
 
     assert len(fake_kibana["upsert"]) == 1
     assert fake_kibana["upsert"][0]["body"] == {
@@ -248,6 +255,7 @@ async def test_runner_end_to_end(
     first_score = fake_kibana["scores"][0]["body"]
     second_score = fake_kibana["scores"][1]["body"]
 
+    assert len(first_score["scores"]) == 1
     assert first_score["metadata"]["execution_id"] == "run-123"
     assert first_score["experiment_name"] == "Tiny named experiment"
     assert first_score["scores"][0]["example"]["dataset"]["id"] == compute_dataset_id("tiny")
@@ -301,7 +309,13 @@ async def test_runner_executes_registered_trace_metrics_through_kibana(
 
     assert len(result.evaluation_runs) == 8
     assert len(fake_kibana["evaluations"]) == 2
-    assert len(fake_kibana["scores"]) == 8
+    # One ingest request per example, carrying all four evaluator scores.
+    assert len(fake_kibana["scores"]) == 2
+    assert all(
+        [score["evaluator"]["name"] for score in request["body"]["scores"]]
+        == ["latency", "input_tokens", "output_tokens", "tool_calls"]
+        for request in fake_kibana["scores"]
+    )
     assert all(
         request["url"] == "http://kibana:5601/internal/evals/_evaluate" for request in fake_kibana["evaluations"]
     )
