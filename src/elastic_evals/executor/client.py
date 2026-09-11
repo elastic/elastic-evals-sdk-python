@@ -25,7 +25,7 @@ from elastic_evals.api import (
 )
 from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
-from elastic_evals.export.documents import build_ingest_score_item
+from elastic_evals.export.documents import build_ingest_scores_request
 from elastic_evals.export.git_metadata import get_git_metadata
 from elastic_evals.inference import KibanaInferenceClient
 from elastic_evals.tracing import (
@@ -190,7 +190,7 @@ class ElasticEvalsClient:
                         )
                     )
                     task_run = runs[run_key]
-                    score_payload = build_ingest_score_item(
+                    score_payload = build_ingest_scores_request(
                         run_id=self.config.run_id,
                         experiment_id=experiment_id,
                         suite_id=self.config.suite_id,
@@ -205,7 +205,7 @@ class ElasticEvalsClient:
                         example_index=example_index,
                         example_input=self._dict_or_none(example.input),
                         task_run=task_run,
-                        evaluation_run=evaluation_runs[-1],
+                        evaluation_runs=[evaluation_runs[-1]],
                         experiment_name=experiment_name,
                     )
                     await self._scores_client.ingest_scores(score_payload)

@@ -16,7 +16,7 @@ from elastic_evals.api import (
     RunMetadata,
 )
 
-from .documents import build_ingest_score_item
+from .documents import build_ingest_scores_request
 from .git_metadata import GitMetadata, get_git_metadata
 
 __all__ = [
@@ -30,6 +30,6 @@ __all__ = [
     "Model",
     "RunMetadata",
     "GitMetadata",
-    "build_ingest_score_item",
+    "build_ingest_scores_request",
     "get_git_metadata",
 ]
