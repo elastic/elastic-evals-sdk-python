@@ -111,7 +111,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Each finished example is also available on `client.score_sink.results`, including the
+Each finished example is also available on `client.score_store.results`, including the
 task output and every evaluator result for that example.
 
 ### Run against Kibana
@@ -141,7 +141,7 @@ async def main() -> None:
 Both clients run the same loop. They differ only in where examples come from and where
 scores go: `ElasticEvalsClient(config)` uses Kibana for both, `ElasticEvalsClient.local(config)`
 uses in-memory implementations. You can also mix them by passing your own `dataset_store=`
-or `score_sink=` to the constructor; see `DatasetStore` and `ScoreSink` in `elastic_evals.types`.
+or `score_store=` to the constructor; see `DatasetStore` and `ScoreStore` in `elastic_evals.types`.
 
 ## Core concepts
 

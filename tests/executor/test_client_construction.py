@@ -10,7 +10,7 @@ from elastic_evals.api import KibanaEvaluatorsClient
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.datasets import InMemoryDatasetStore, KibanaDatasetStore
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.export import InMemoryScoreSink, KibanaScoreSink
+from elastic_evals.export import InMemoryScoreStore, KibanaScoreStore
 from elastic_evals.tracing import TracingConfig
 
 
@@ -22,26 +22,26 @@ def test_local_client_needs_no_kibana_credentials_or_connector() -> None:
     client = ElasticEvalsClient.local(_config())
 
     assert isinstance(client.dataset_store, InMemoryDatasetStore)
-    assert isinstance(client.score_sink, InMemoryScoreSink)
+    assert isinstance(client.score_store, InMemoryScoreStore)
 
 
-def test_injected_store_and_sink_are_returned_as_given() -> None:
+def test_injected_store_and_score_store_are_returned_as_given() -> None:
     store = InMemoryDatasetStore()
-    sink = InMemoryScoreSink()
+    score_store = InMemoryScoreStore()
 
-    client = ElasticEvalsClient(_config(), dataset_store=store, score_sink=sink)
+    client = ElasticEvalsClient(_config(), dataset_store=store, score_store=score_store)
 
     assert client.dataset_store is store
-    assert client.score_sink is sink
+    assert client.score_store is score_store
 
 
 def test_defaults_are_kibana_backed_and_built_once() -> None:
     client = ElasticEvalsClient(_config(kibana_url="http://kibana:5601", kibana_api_key="k"))
 
     assert isinstance(client.dataset_store, KibanaDatasetStore)
-    assert isinstance(client.score_sink, KibanaScoreSink)
+    assert isinstance(client.score_store, KibanaScoreStore)
     assert client.dataset_store is client.dataset_store
-    assert client.score_sink is client.score_sink
+    assert client.score_store is client.score_store
 
 
 def test_evaluators_client_is_lazy_and_cached() -> None:

@@ -15,7 +15,7 @@ from elastic_evals.types import (
     ExampleWithId,
     RunContext,
     RunData,
-    ScoreSink,
+    ScoreStore,
 )
 
 
@@ -56,17 +56,17 @@ def test_run_context_optional_fields_default_to_none() -> None:
     assert context.git_commit_sha is None
 
 
-def test_store_and_sink_accept_any_object_with_matching_methods() -> None:
-    class Store:
+def test_store_and_score_store_accept_any_object_with_matching_methods() -> None:
+    class FakeDatasetStore:
         async def resolve(self, dataset: EvaluationDataset) -> list[ExampleWithId]:
             return []
 
-    class Sink:
+    class FakeScoreStore:
         async def write(self, result: ExampleResult) -> None:
             return None
 
-    store: DatasetStore = Store()
-    sink: ScoreSink = Sink()
+    store: DatasetStore = FakeDatasetStore()
+    score_store: ScoreStore = FakeScoreStore()
 
     assert callable(store.resolve)
-    assert callable(sink.write)
+    assert callable(score_store.write)

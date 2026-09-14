@@ -2,14 +2,14 @@
 # or more contributor license agreements. Licensed under the Elastic License 2.0;
 # you may not use this file except in compliance with the Elastic License 2.0.
 
-"""Score sink that keeps results in memory instead of sending them anywhere."""
+"""Score store that keeps results in memory instead of sending them anywhere."""
 
 from __future__ import annotations
 
 from elastic_evals.types import ExampleResult
 
 
-class InMemoryScoreSink:
+class InMemoryScoreStore:
     """Collects every finished example in `results`, in the order they complete.
 
     Each entry keeps its `example_index` and `repetition`, so results can be re-sorted

@@ -18,13 +18,13 @@ from elastic_evals.api import (
 
 from .documents import build_ingest_scores_request
 from .git_metadata import GitMetadata, get_git_metadata
-from .kibana import UNKNOWN_MODEL_ID, KibanaScoreSink
-from .memory import InMemoryScoreSink
+from .kibana import UNKNOWN_MODEL_ID, KibanaScoreStore
+from .memory import InMemoryScoreStore
 
 __all__ = [
     "UNKNOWN_MODEL_ID",
-    "InMemoryScoreSink",
-    "KibanaScoreSink",
+    "InMemoryScoreStore",
+    "KibanaScoreStore",
     "Ci",
     "Environment",
     "IngestEvaluator",

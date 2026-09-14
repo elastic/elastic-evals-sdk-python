@@ -11,7 +11,7 @@ import pytest
 
 from elastic_evals.api import IngestScoresRequest, IngestScoresResponse
 from elastic_evals.api.scores_client import KibanaScoresClient
-from elastic_evals.export import UNKNOWN_MODEL_ID, KibanaScoreSink
+from elastic_evals.export import UNKNOWN_MODEL_ID, KibanaScoreStore
 from elastic_evals.types import EvaluationResult, EvaluationRun, ExampleResult, ExampleWithId, RunContext, RunData
 
 
@@ -72,7 +72,7 @@ async def test_write_sends_all_evaluator_results_in_one_request() -> None:
         EvaluationRun(name="groundedness", result=None, trace_id=None),
     ]
 
-    await KibanaScoreSink(client).write(_result(_context(connector_id="conn"), runs))
+    await KibanaScoreStore(client).write(_result(_context(connector_id="conn"), runs))
 
     request = _sent(client)
     assert [item.evaluator.name for item in request.scores] == ["latency", "correctness", "groundedness"]
@@ -90,7 +90,7 @@ async def test_write_sends_all_evaluator_results_in_one_request() -> None:
 async def test_write_skips_the_request_when_there_are_no_evaluator_results() -> None:
     client = _client()
 
-    await KibanaScoreSink(client).write(_result(_context(connector_id="conn"), []))
+    await KibanaScoreStore(client).write(_result(_context(connector_id="conn"), []))
 
     client.ingest_scores.assert_not_awaited()
 
@@ -100,17 +100,17 @@ async def test_task_model_prefers_configured_model_then_connector_then_unknown()
     runs = [EvaluationRun(name="latency")]
 
     client = _client()
-    await KibanaScoreSink(client).write(
+    await KibanaScoreStore(client).write(
         _result(_context(model={"id": "gpt-x", "family": "gpt", "provider": "openai"}, connector_id="conn"), runs)
     )
     assert _sent(client).task_model.model_dump() == {"id": "gpt-x", "family": "gpt", "provider": "openai"}
 
     client = _client()
-    await KibanaScoreSink(client).write(_result(_context(connector_id="conn"), runs))
+    await KibanaScoreStore(client).write(_result(_context(connector_id="conn"), runs))
     assert _sent(client).task_model.id == "conn"
 
     client = _client()
-    await KibanaScoreSink(client).write(_result(_context(), runs))
+    await KibanaScoreStore(client).write(_result(_context(), runs))
     assert _sent(client).task_model.id == UNKNOWN_MODEL_ID
 
 
@@ -118,7 +118,7 @@ async def test_task_model_prefers_configured_model_then_connector_then_unknown()
 async def test_task_model_coerces_non_string_values_from_config() -> None:
     client = _client()
 
-    await KibanaScoreSink(client).write(
+    await KibanaScoreStore(client).write(
         _result(_context(model={"id": 123, "family": 4, "provider": 7}), [EvaluationRun(name="latency")])
     )
 
@@ -129,7 +129,7 @@ async def test_task_model_coerces_non_string_values_from_config() -> None:
 async def test_evaluator_model_does_not_inherit_task_model_family_or_provider() -> None:
     client = _client()
 
-    await KibanaScoreSink(client).write(
+    await KibanaScoreStore(client).write(
         _result(
             _context(model={"id": "gpt-x", "family": "gpt", "provider": "openai"}, evaluator_connector_id="judge"),
             [EvaluationRun(name="latency")],
@@ -144,13 +144,13 @@ async def test_evaluator_model_prefers_evaluator_connector_then_connector_then_u
     runs = [EvaluationRun(name="latency")]
 
     client = _client()
-    await KibanaScoreSink(client).write(_result(_context(connector_id="conn", evaluator_connector_id="judge"), runs))
+    await KibanaScoreStore(client).write(_result(_context(connector_id="conn", evaluator_connector_id="judge"), runs))
     assert _sent(client).evaluator_model.id == "judge"
 
     client = _client()
-    await KibanaScoreSink(client).write(_result(_context(connector_id="conn"), runs))
+    await KibanaScoreStore(client).write(_result(_context(connector_id="conn"), runs))
     assert _sent(client).evaluator_model.id == "conn"
 
     client = _client()
-    await KibanaScoreSink(client).write(_result(_context(), runs))
+    await KibanaScoreStore(client).write(_result(_context(), runs))
     assert _sent(client).evaluator_model.id == UNKNOWN_MODEL_ID

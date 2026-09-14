@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import socket
 import uuid
@@ -17,14 +18,10 @@ from elastic_evals.api import KibanaDatasetsClient, KibanaEvaluatorsClient, comp
 from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.datasets import InMemoryDatasetStore, KibanaDatasetStore
-from elastic_evals.export import InMemoryScoreSink, KibanaScoreSink
+from elastic_evals.export import InMemoryScoreStore, KibanaScoreStore
 from elastic_evals.export.git_metadata import get_git_metadata
 from elastic_evals.inference import KibanaInferenceClient
-from elastic_evals.tracing import (
-    get_current_trace_id,
-    with_evaluator_span,
-    with_task_span,
-)
+from elastic_evals.tracing import get_current_trace_id, with_evaluator_span, with_task_span
 from elastic_evals.types import (
     DatasetStore,
     EvaluationDataset,
@@ -37,7 +34,7 @@ from elastic_evals.types import (
     RanExperiment,
     RunContext,
     RunData,
-    ScoreSink,
+    ScoreStore,
     TaskOutput,
 )
 from elastic_evals.utils.logging import (
@@ -54,10 +51,10 @@ ExperimentTask = Callable[[Example], Awaitable[TaskOutput]]
 
 
 class ElasticEvalsClient:
-    """Runs experiments: calls the task, runs evaluators, and hands results to a score sink.
+    """Runs experiments: calls the task, runs evaluators, and hands results to a score store.
 
     Where examples come from and where scores go are pluggable. By default both are Kibana,
-    built lazily from `config` on first use. Pass `dataset_store` / `score_sink` to replace
+    built lazily from `config` on first use. Pass `dataset_store` / `score_store` to replace
     either, or use `ElasticEvalsClient.local` for a fully in-memory run.
     """
 
@@ -67,7 +64,7 @@ class ElasticEvalsClient:
         logger: logging.Logger | None = None,
         *,
         dataset_store: DatasetStore | None = None,
-        score_sink: ScoreSink | None = None,
+        score_store: ScoreStore | None = None,
     ) -> None:
         self.config = config
         self._logger = logger or config.logger
@@ -75,14 +72,14 @@ class ElasticEvalsClient:
         self._inference_client: KibanaInferenceClient | None = None
         self._evaluators_client: KibanaEvaluatorsClient | None = None
         self._dataset_store = dataset_store
-        self._score_sink = score_sink
-        # Only the default Kibana sink has a results page worth linking to.
-        self._log_kibana_results_url = score_sink is None
+        self._score_store = score_store
+        # Only the default Kibana store has a results page worth linking to.
+        self._log_kibana_results_url = score_store is None
 
     @classmethod
     def local(cls, config: ElasticEvalsConfig, logger: logging.Logger | None = None) -> ElasticEvalsClient:
         """Client that runs entirely in memory: no Kibana calls and no connector required."""
-        return cls(config, logger, dataset_store=InMemoryDatasetStore(), score_sink=InMemoryScoreSink())
+        return cls(config, logger, dataset_store=InMemoryDatasetStore(), score_store=InMemoryScoreStore())
 
     @property
     def dataset_store(self) -> DatasetStore:
@@ -93,12 +90,12 @@ class ElasticEvalsClient:
         return self._dataset_store
 
     @property
-    def score_sink(self) -> ScoreSink:
-        if self._score_sink is None:
-            self._score_sink = KibanaScoreSink(
+    def score_store(self) -> ScoreStore:
+        if self._score_store is None:
+            self._score_store = KibanaScoreStore(
                 KibanaScoresClient(kibana_url=self.config.kibana_url, api_key=self.config.kibana_api_key)
             )
-        return self._score_sink
+        return self._score_store
 
     def get_inference_client(self) -> KibanaInferenceClient:
         if self._inference_client is None:
@@ -199,10 +196,9 @@ class ElasticEvalsClient:
                 for evaluator in evaluators:
                     log_evaluator_start(evaluator.name, example_index, repetition)
 
-                    async def evaluator_runner() -> Any:
-                        return await evaluator.evaluate(params)
-
-                    result, eval_trace_id = await with_evaluator_span(evaluator.name, {}, evaluator_runner)
+                    result, eval_trace_id = await with_evaluator_span(
+                        evaluator.name, {}, functools.partial(evaluator.evaluate, params)
+                    )
                     evaluation_run = EvaluationRun(
                         name=evaluator.name,
                         result=result,
@@ -216,9 +212,7 @@ class ElasticEvalsClient:
                     example_evaluation_runs.append(evaluation_run)
                     log_evaluator_complete(evaluator.name, example_index, repetition)
 
-                # One write per finished example keeps ingestion incremental: a crash later in
-                # the run cannot lose scores that were already handed to the sink.
-                await self.score_sink.write(
+                await self.score_store.write(
                     ExampleResult(
                         context=context,
                         example=example,

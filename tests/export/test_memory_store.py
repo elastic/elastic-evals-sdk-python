@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from elastic_evals.export import InMemoryScoreSink
+from elastic_evals.export import InMemoryScoreStore
 from elastic_evals.types import EvaluationRun, ExampleResult, ExampleWithId, RunContext, RunData
 
 
@@ -34,12 +34,12 @@ def _result(example_index: int) -> ExampleResult:
 
 
 @pytest.mark.asyncio
-async def test_sink_starts_empty_and_keeps_results_in_write_order() -> None:
-    sink = InMemoryScoreSink()
-    assert sink.results == []
+async def test_score_store_starts_empty_and_keeps_results_in_write_order() -> None:
+    score_store = InMemoryScoreStore()
+    assert score_store.results == []
 
-    await sink.write(_result(1))
-    await sink.write(_result(0))
+    await score_store.write(_result(1))
+    await score_store.write(_result(0))
 
-    assert [result.example_index for result in sink.results] == [1, 0]
-    assert sink.results[0].evaluation_runs[0].name == "latency"
+    assert [result.example_index for result in score_store.results] == [1, 0]
+    assert score_store.results[0].evaluation_runs[0].name == "latency"

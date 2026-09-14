@@ -153,7 +153,7 @@ class DatasetStore(Protocol):
     async def resolve(self, dataset: EvaluationDataset) -> list[ExampleWithId]: ...
 
 
-class ScoreSink(Protocol):
+class ScoreStore(Protocol):
     """Receives one finished (example, repetition) at a time, as soon as it completes."""
 
     async def write(self, result: ExampleResult) -> None: ...
@@ -173,6 +173,6 @@ __all__ = [
     "RanExperiment",
     "RunContext",
     "RunData",
-    "ScoreSink",
+    "ScoreStore",
     "TaskOutput",
 ]

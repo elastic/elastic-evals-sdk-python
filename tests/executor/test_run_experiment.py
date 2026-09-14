@@ -15,7 +15,7 @@ from elastic_evals.api import compute_dataset_id
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.datasets import InMemoryDatasetStore
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.export import InMemoryScoreSink
+from elastic_evals.export import InMemoryScoreStore
 from elastic_evals.tracing import TracingConfig
 from elastic_evals.types import (
     EvaluationDataset,
@@ -61,8 +61,8 @@ async def _echo_task(example: Example) -> dict[str, Any]:
     return {"answer": example.input["q"]}
 
 
-def _sorted(sink: InMemoryScoreSink) -> list[ExampleResult]:
-    return sorted(sink.results, key=lambda result: (result.repetition, result.example_index))
+def _sorted(score_store: InMemoryScoreStore) -> list[ExampleResult]:
+    return sorted(score_store.results, key=lambda result: (result.repetition, result.example_index))
 
 
 @pytest.mark.asyncio
@@ -87,14 +87,14 @@ async def test_task_receives_store_examples_and_evaluators_receive_task_output()
 
 
 @pytest.mark.asyncio
-async def test_sink_receives_one_batch_per_example_with_all_evaluators_in_order() -> None:
-    sink = InMemoryScoreSink()
+async def test_score_store_receives_one_batch_per_example_with_all_evaluators_in_order() -> None:
+    score_store = InMemoryScoreStore()
     evaluators = [RecordingEvaluator("a", 0.1), RecordingEvaluator("b", 0.2), RecordingEvaluator("c", 0.3)]
-    client = ElasticEvalsClient(_config(), dataset_store=InMemoryDatasetStore(), score_sink=sink)
+    client = ElasticEvalsClient(_config(), dataset_store=InMemoryDatasetStore(), score_store=score_store)
 
     result = await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=evaluators)
 
-    batches = _sorted(sink)
+    batches = _sorted(score_store)
     assert [batch.example_index for batch in batches] == [0, 1]
     assert all([run.name for run in batch.evaluation_runs] == ["a", "b", "c"] for batch in batches)
     assert batches[0].task_run.output == {"answer": "hi"}
@@ -110,9 +110,14 @@ async def test_repetitions_produce_a_batch_per_example_per_repetition() -> None:
 
     await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[RecordingEvaluator("a", 1.0)])
 
-    sink = client.score_sink
-    assert isinstance(sink, InMemoryScoreSink)
-    assert {(batch.example_index, batch.repetition) for batch in sink.results} == {(0, 0), (1, 0), (0, 1), (1, 1)}
+    score_store = client.score_store
+    assert isinstance(score_store, InMemoryScoreStore)
+    assert {(batch.example_index, batch.repetition) for batch in score_store.results} == {
+        (0, 0),
+        (1, 0),
+        (0, 1),
+        (1, 1),
+    }
 
 
 @pytest.mark.asyncio
@@ -125,9 +130,9 @@ async def test_run_context_carries_run_level_facts() -> None:
         dataset=_dataset(), task=_echo_task, evaluators=[RecordingEvaluator("a", 1.0)], experiment_name="named"
     )
 
-    sink = client.score_sink
-    assert isinstance(sink, InMemoryScoreSink)
-    context = sink.results[0].context
+    score_store = client.score_store
+    assert isinstance(score_store, InMemoryScoreStore)
+    context = score_store.results[0].context
     assert context.run_id == "run-9"
     assert context.experiment_id == ran.id
     assert context.experiment_name == "named"
@@ -164,21 +169,21 @@ async def test_zero_evaluators_still_writes_each_example() -> None:
 
     await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[])
 
-    sink = client.score_sink
-    assert isinstance(sink, InMemoryScoreSink)
-    assert len(sink.results) == 2
-    assert all(batch.evaluation_runs == [] for batch in sink.results)
+    score_store = client.score_store
+    assert isinstance(score_store, InMemoryScoreStore)
+    assert len(score_store.results) == 2
+    assert all(batch.evaluation_runs == [] for batch in score_store.results)
 
 
 @pytest.mark.asyncio
-async def test_failing_sink_aborts_the_run_and_records_no_experiment() -> None:
-    class ExplodingSink:
+async def test_failing_score_store_aborts_the_run_and_records_no_experiment() -> None:
+    class ExplodingScoreStore:
         async def write(self, result: ExampleResult) -> None:
-            raise RuntimeError("sink down")
+            raise RuntimeError("store down")
 
-    client = ElasticEvalsClient(_config(), dataset_store=InMemoryDatasetStore(), score_sink=ExplodingSink())
+    client = ElasticEvalsClient(_config(), dataset_store=InMemoryDatasetStore(), score_store=ExplodingScoreStore())
 
-    with pytest.raises(RuntimeError, match="sink down"):
+    with pytest.raises(RuntimeError, match="store down"):
         await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[])
 
     assert await client.get_ran_experiments() == []
@@ -207,8 +212,8 @@ async def test_interaction_trace_id_is_popped_from_dict_output_before_storage() 
 
     await client.run_experiment(dataset=_dataset(), task=task, evaluators=[evaluator])
 
-    sink = client.score_sink
-    assert isinstance(sink, InMemoryScoreSink)
-    assert sink.results[0].task_run.trace_id == "trace-42"
-    assert sink.results[0].task_run.output == {"answer": "x"}
+    score_store = client.score_store
+    assert isinstance(score_store, InMemoryScoreStore)
+    assert score_store.results[0].task_run.trace_id == "trace-42"
+    assert score_store.results[0].task_run.output == {"answer": "x"}
     assert evaluator.params[0].trace_id == "trace-42"

@@ -2,7 +2,7 @@
 # or more contributor license agreements. Licensed under the Elastic License 2.0;
 # you may not use this file except in compliance with the Elastic License 2.0.
 
-"""Score sink that posts each finished example to the Kibana evals scores API."""
+"""Score store that posts each finished example to the Kibana evals scores API."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ UNKNOWN_MODEL_ID = "unknown"
 """Model id sent to Kibana when neither a model nor a connector is configured."""
 
 
-class KibanaScoreSink:
+class KibanaScoreStore:
     """Translates one `ExampleResult` into a single Kibana ingest request and sends it.
 
     One request per (example, repetition) keeps ingestion incremental: a crash mid-run
