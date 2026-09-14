@@ -41,7 +41,7 @@ class EvaluationDataset(BaseModel, Generic[TExample]):
     instances and the task callable receives those. With the default Kibana store the
     examples are upserted and re-fetched, so ids come from the server and only dict-shaped
     `output`/`metadata` survive. With `InMemoryDatasetStore` the examples pass through
-    unchanged and ids are derived from the dataset name and position.
+    unchanged and ids are derived from each example's content.
     """
 
     name: str

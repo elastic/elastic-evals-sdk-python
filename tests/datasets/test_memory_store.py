@@ -55,3 +55,45 @@ async def test_ids_differ_between_datasets_with_different_names() -> None:
     farewells = await InMemoryDatasetStore().resolve(_dataset("farewells"))
 
     assert {example.id for example in greetings}.isdisjoint({example.id for example in farewells})
+
+
+# The next three tests mirror how Kibana assigns example ids: by content, not position.
+
+
+@pytest.mark.asyncio
+async def test_reordering_examples_keeps_their_ids() -> None:
+    original = _dataset()
+    reordered = EvaluationDataset(
+        name=original.name, description=original.description, examples=list(reversed(original.examples))
+    )
+
+    by_input_original = {e.input["q"]: e.id for e in await InMemoryDatasetStore().resolve(original)}
+    by_input_reordered = {e.input["q"]: e.id for e in await InMemoryDatasetStore().resolve(reordered)}
+
+    assert by_input_original == by_input_reordered
+
+
+@pytest.mark.asyncio
+async def test_editing_one_example_changes_only_its_id() -> None:
+    original = _dataset()
+    edited = EvaluationDataset(
+        name=original.name,
+        description=original.description,
+        examples=[Example(input={"q": "hi"}, output="hello there", metadata={"lang": "en"}), original.examples[1]],
+    )
+
+    original_ids = [e.id for e in await InMemoryDatasetStore().resolve(original)]
+    edited_ids = [e.id for e in await InMemoryDatasetStore().resolve(edited)]
+
+    assert edited_ids[0] != original_ids[0]
+    assert edited_ids[1] == original_ids[1]
+
+
+@pytest.mark.asyncio
+async def test_identical_examples_share_an_id() -> None:
+    same = Example(input={"q": "hi"}, output="hello")
+    dataset = EvaluationDataset(name="dupes", description="", examples=[same, same.model_copy()])
+
+    resolved = await InMemoryDatasetStore().resolve(dataset)
+
+    assert resolved[0].id == resolved[1].id

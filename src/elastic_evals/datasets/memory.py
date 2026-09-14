@@ -6,28 +6,32 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 
 from elastic_evals.api.datasets_client import compute_dataset_id
-from elastic_evals.types import EvaluationDataset, ExampleWithId
+from elastic_evals.types import EvaluationDataset, Example, ExampleWithId
 
 
 class InMemoryDatasetStore:
-    """Hands the runner the user's own examples, creating an id for each one.
+    """Hands the runner the user's own examples, with an id derived from each example's content.
 
-    Kibana normally creates example ids on upsert. Without Kibana, this store has to do it.
-    Ids must be strings, unique within a dataset, and stable across reruns of the same
-    dataset so results from two local runs can be compared example by example.
+    Same rule as Kibana: identical content within a dataset gives the same id, regardless of position.
     """
 
     async def resolve(self, dataset: EvaluationDataset) -> list[ExampleWithId]:
         namespace = uuid.UUID(compute_dataset_id(dataset.name))
         return [
             ExampleWithId(
-                id=str(uuid.uuid5(namespace, str(index))),
+                id=str(uuid.uuid5(namespace, _content_key(example))),
                 input=example.input,
                 output=example.output,
                 metadata=example.metadata,
             )
-            for index, example in enumerate(dataset.examples)
+            for example in dataset.examples
         ]
+
+
+def _content_key(example: Example) -> str:
+    content = example.model_dump(mode="json", include={"input", "output", "metadata"}, exclude_none=True)
+    return json.dumps(content, sort_keys=True, separators=(",", ":"))

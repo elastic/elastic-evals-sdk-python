@@ -151,7 +151,7 @@ An `EvaluationDataset` is a collection of `Example` items with input, expected o
 and optional metadata. With the default Kibana client, the dataset is upserted to Kibana
 before each run as a full replacement and refreshed from Kibana's canonical examples, so
 example ids come from the server. With `ElasticEvalsClient.local()`, examples are used as-is
-and ids are derived from the dataset name and example position.
+and ids are derived from each example's content, following the same rule Kibana applies.
 
 ### Task
 
