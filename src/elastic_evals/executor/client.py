@@ -25,6 +25,7 @@ from elastic_evals.tracing import get_current_trace_id, with_evaluator_span, wit
 from elastic_evals.types import (
     DatasetStore,
     EvaluationDataset,
+    EvaluationResult,
     EvaluationRun,
     Evaluator,
     EvaluatorParams,
@@ -40,6 +41,7 @@ from elastic_evals.types import (
 from elastic_evals.utils.logging import (
     log_evaluation_start,
     log_evaluator_complete,
+    log_evaluator_error,
     log_evaluator_start,
     log_experiment_complete,
     log_experiment_start,
@@ -196,9 +198,14 @@ class ElasticEvalsClient:
                 for evaluator in evaluators:
                     log_evaluator_start(evaluator.name, example_index, repetition)
 
-                    result, eval_trace_id = await with_evaluator_span(
-                        evaluator.name, {}, functools.partial(evaluator.evaluate, params)
-                    )
+                    try:
+                        result, eval_trace_id = await with_evaluator_span(
+                            evaluator.name, {}, functools.partial(evaluator.evaluate, params)
+                        )
+                    except Exception as exc:
+                        log_evaluator_error(evaluator.name, example_index, repetition, exc)
+                        result = EvaluationResult(score=None, label="error", explanation=f"{type(exc).__name__}: {exc}")
+                        eval_trace_id = None
                     evaluation_run = EvaluationRun(
                         name=evaluator.name,
                         result=result,
