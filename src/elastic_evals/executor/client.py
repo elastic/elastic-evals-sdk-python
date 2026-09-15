@@ -7,41 +7,34 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import socket
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from elastic_evals.api import (
-    Ci,
-    Environment,
-    KibanaDatasetsClient,
-    KibanaEvaluatorsClient,
-    Model,
-    RunMetadata,
-    UpsertDatasetExamplePayload,
-    compute_dataset_id,
-)
+from elastic_evals.api import KibanaDatasetsClient, KibanaEvaluatorsClient, compute_dataset_id
 from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
-from elastic_evals.export.documents import build_ingest_score_item
+from elastic_evals.datasets import InMemoryDatasetStore, KibanaDatasetStore
+from elastic_evals.export import InMemoryScoreStore, KibanaScoreStore
 from elastic_evals.export.git_metadata import get_git_metadata
 from elastic_evals.inference import KibanaInferenceClient
-from elastic_evals.tracing import (
-    get_current_trace_id,
-    with_evaluator_span,
-    with_task_span,
-)
+from elastic_evals.tracing import get_current_trace_id, with_evaluator_span, with_task_span
 from elastic_evals.types import (
+    DatasetStore,
     EvaluationDataset,
     EvaluationRun,
     Evaluator,
     EvaluatorParams,
     Example,
+    ExampleResult,
     ExampleWithId,
     RanExperiment,
+    RunContext,
     RunData,
+    ScoreStore,
     TaskOutput,
 )
 from elastic_evals.utils.logging import (
@@ -58,27 +51,60 @@ ExperimentTask = Callable[[Example], Awaitable[TaskOutput]]
 
 
 class ElasticEvalsClient:
-    def __init__(self, config: ElasticEvalsConfig, logger: logging.Logger | None = None) -> None:
+    """Runs experiments: calls the task, runs evaluators, and hands results to a score store.
+
+    Where examples come from and where scores go are pluggable. By default both are Kibana,
+    built lazily from `config` on first use. Pass `dataset_store` / `score_store` to replace
+    either, or use `ElasticEvalsClient.local` for a fully in-memory run.
+    """
+
+    def __init__(
+        self,
+        config: ElasticEvalsConfig,
+        logger: logging.Logger | None = None,
+        *,
+        dataset_store: DatasetStore | None = None,
+        score_store: ScoreStore | None = None,
+    ) -> None:
         self.config = config
         self._logger = logger or config.logger
         self._experiments: list[RanExperiment] = []
         self._inference_client: KibanaInferenceClient | None = None
-        self._datasets_client = KibanaDatasetsClient(
-            kibana_url=self.config.kibana_url,
-            api_key=self.config.kibana_api_key,
-        )
-        self._scores_client = KibanaScoresClient(
-            kibana_url=self.config.kibana_url,
-            api_key=self.config.kibana_api_key,
-        )
-        self._evaluators_client = KibanaEvaluatorsClient(
-            kibana_url=self.config.kibana_url,
-            api_key=self.config.kibana_api_key,
-        )
+        self._evaluators_client: KibanaEvaluatorsClient | None = None
+        self._dataset_store = dataset_store
+        self._score_store = score_store
+        # Only the default Kibana store has a results page worth linking to.
+        self._log_kibana_results_url = score_store is None
+
+    @classmethod
+    def local(cls, config: ElasticEvalsConfig, logger: logging.Logger | None = None) -> ElasticEvalsClient:
+        """Client that runs entirely in memory: no Kibana calls and no connector required."""
+        return cls(config, logger, dataset_store=InMemoryDatasetStore(), score_store=InMemoryScoreStore())
+
+    @property
+    def dataset_store(self) -> DatasetStore:
+        if self._dataset_store is None:
+            self._dataset_store = KibanaDatasetStore(
+                KibanaDatasetsClient(kibana_url=self.config.kibana_url, api_key=self.config.kibana_api_key)
+            )
+        return self._dataset_store
+
+    @property
+    def score_store(self) -> ScoreStore:
+        if self._score_store is None:
+            self._score_store = KibanaScoreStore(
+                KibanaScoresClient(kibana_url=self.config.kibana_url, api_key=self.config.kibana_api_key)
+            )
+        return self._score_store
 
     def get_inference_client(self) -> KibanaInferenceClient:
         if self._inference_client is None:
             connector_id = self.config.evaluator_connector_id or self.config.connector_id
+            if not connector_id:
+                raise ValueError(
+                    "An inference connector is required for LLM calls: set ElasticEvalsConfig.connector_id "
+                    "or evaluator_connector_id (env CONNECTOR_ID / EVALUATION_CONNECTOR_ID)."
+                )
             self._inference_client = KibanaInferenceClient(
                 kibana_url=self.config.kibana_url,
                 connector_id=connector_id,
@@ -87,6 +113,11 @@ class ElasticEvalsClient:
         return self._inference_client
 
     def get_evaluators_client(self) -> KibanaEvaluatorsClient:
+        if self._evaluators_client is None:
+            self._evaluators_client = KibanaEvaluatorsClient(
+                kibana_url=self.config.kibana_url,
+                api_key=self.config.kibana_api_key,
+            )
         return self._evaluators_client
 
     async def run_experiment(
@@ -104,34 +135,24 @@ class ElasticEvalsClient:
         dataset_id = compute_dataset_id(dataset.name)
         experiment_id = str(uuid.uuid4())
         repetitions = self.config.repetitions
-        task_model = self._build_task_model()
-        evaluator_model = self._build_evaluator_model()
-        run_metadata = self._build_run_metadata()
-        environment = Environment(hostname=socket.gethostname())
-        ci: Ci | None = None
-
-        await self._datasets_client.upsert(
-            dataset.name,
-            dataset.description,
-            [
-                UpsertDatasetExamplePayload(
-                    input=self._dict_or_none(example.input),
-                    output=self._dict_or_none(example.output),
-                    metadata=self._dict_or_none(example.metadata),
-                )
-                for example in dataset.examples
-            ],
+        git_metadata = get_git_metadata()
+        context = RunContext(
+            run_id=self.config.run_id,
+            experiment_id=experiment_id,
+            experiment_name=experiment_name,
+            suite_id=self.config.suite_id,
+            dataset_id=dataset_id,
+            dataset_name=dataset.name,
+            repetitions=repetitions,
+            hostname=socket.gethostname(),
+            model=self.config.model,
+            connector_id=self.config.connector_id,
+            evaluator_connector_id=self.config.evaluator_connector_id,
+            git_branch=git_metadata.branch,
+            git_commit_sha=git_metadata.commit_sha,
         )
-        upstream_dataset = await self._datasets_client.get(dataset_id)
-        upstream_examples = [
-            ExampleWithId(
-                id=example.id,
-                input=example.input or {},
-                output=example.output,
-                metadata=example.metadata,
-            )
-            for example in upstream_dataset.examples
-        ]
+
+        examples = await self.dataset_store.resolve(dataset)
 
         runs: dict[str, RunData] = {}
         evaluation_runs: list[EvaluationRun] = []
@@ -171,54 +192,46 @@ class ElasticEvalsClient:
                     trace_id=task_trace_id,
                 )
 
+                example_evaluation_runs: list[EvaluationRun] = []
                 for evaluator in evaluators:
                     log_evaluator_start(evaluator.name, example_index, repetition)
 
-                    async def evaluator_runner() -> Any:
-                        return await evaluator.evaluate(params)
-
-                    result, eval_trace_id = await with_evaluator_span(evaluator.name, {}, evaluator_runner)
-                    evaluation_runs.append(
-                        EvaluationRun(
-                            name=evaluator.name,
-                            result=result,
-                            example_index=example_index,
-                            repetition_index=repetition,
-                            experiment_run_id=run_key,
-                            trace_id=eval_trace_id or get_current_trace_id(),
-                            example_id=example.id,
-                        )
+                    result, eval_trace_id = await with_evaluator_span(
+                        evaluator.name, {}, functools.partial(evaluator.evaluate, params)
                     )
-                    task_run = runs[run_key]
-                    score_payload = build_ingest_score_item(
-                        run_id=self.config.run_id,
-                        experiment_id=experiment_id,
-                        suite_id=self.config.suite_id,
-                        task_model=task_model,
-                        evaluator_model=evaluator_model,
-                        run_metadata=run_metadata,
-                        environment=environment,
-                        ci=ci,
-                        dataset_id=dataset_id,
-                        dataset_name=dataset.name,
-                        example_id=example.id,
+                    evaluation_run = EvaluationRun(
+                        name=evaluator.name,
+                        result=result,
                         example_index=example_index,
-                        example_input=self._dict_or_none(example.input),
-                        task_run=task_run,
-                        evaluation_run=evaluation_runs[-1],
-                        experiment_name=experiment_name,
+                        repetition_index=repetition,
+                        experiment_run_id=run_key,
+                        trace_id=eval_trace_id or get_current_trace_id(),
+                        example_id=example.id,
                     )
-                    await self._scores_client.ingest_scores(score_payload)
+                    evaluation_runs.append(evaluation_run)
+                    example_evaluation_runs.append(evaluation_run)
                     log_evaluator_complete(evaluator.name, example_index, repetition)
+
+                await self.score_store.write(
+                    ExampleResult(
+                        context=context,
+                        example=example,
+                        example_index=example_index,
+                        repetition=repetition,
+                        task_run=runs[run_key],
+                        evaluation_runs=example_evaluation_runs,
+                    )
+                )
 
         jobs: list[Awaitable[None]] = []
         for rep in range(repetitions):
-            for example_index, example in enumerate(upstream_examples):
+            for example_index, example in enumerate(examples):
                 jobs.append(run_example(example, example_index, rep))
 
         await asyncio.gather(*jobs)
         log_experiment_complete(experiment_id)
-        log_results_url(self.config.kibana_url, self.config.run_id)
+        if self._log_kibana_results_url:
+            log_results_url(self.config.kibana_url, self.config.run_id)
 
         experiment_metadata: dict[str, Any] = {"run_id": self.config.run_id}
         if metadata:
@@ -240,31 +253,3 @@ class ElasticEvalsClient:
 
     async def get_ran_experiments(self) -> list[RanExperiment]:
         return self._experiments
-
-    @staticmethod
-    def _dict_or_none(value: Any) -> dict[str, Any] | None:
-        if isinstance(value, dict):
-            return value
-        return None
-
-    def _build_task_model(self) -> Model:
-        configured_model = self.config.model or {}
-        model_id = configured_model.get("id")
-        model_family = configured_model.get("family")
-        model_provider = configured_model.get("provider")
-        return Model(
-            id=str(model_id) if model_id is not None else self.config.connector_id,
-            family=str(model_family) if model_family is not None else None,
-            provider=str(model_provider) if model_provider is not None else None,
-        )
-
-    def _build_evaluator_model(self) -> Model:
-        return Model(id=self.config.evaluator_connector_id or self.config.connector_id)
-
-    def _build_run_metadata(self) -> RunMetadata:
-        git_metadata = get_git_metadata()
-        return RunMetadata(
-            total_repetitions=self.config.repetitions,
-            git_branch=git_metadata.branch,
-            git_commit_sha=git_metadata.commit_sha,
-        )

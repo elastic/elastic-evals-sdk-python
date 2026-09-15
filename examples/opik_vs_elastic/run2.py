@@ -35,7 +35,7 @@ from elastic_evals.api import (
 from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.export import build_ingest_score_item, get_git_metadata
+from elastic_evals.export import build_ingest_scores_request, get_git_metadata
 from elastic_evals.integrations.agent_builder import (
     AgentBuilderClient,
     AgentConfiguration,
@@ -143,11 +143,11 @@ async def agent_builder_task(
     return task_output
 
 
-def _task_model(config: ElasticEvalsConfig) -> Model:
+def _task_model(config: ElasticEvalsConfig, connector_id: str) -> Model:
     configured = config.model or {}
     model_id = configured.get("id")
     return Model(
-        id=str(model_id) if model_id is not None else config.connector_id,
+        id=str(model_id) if model_id is not None else connector_id,
         family=str(configured["family"]) if configured.get("family") is not None else None,
         provider=str(configured["provider"]) if configured.get("provider") is not None else None,
     )
@@ -204,7 +204,7 @@ def _score_request(
     scored_runs: list[tuple[dict[str, Any], EvaluationRun]],
 ) -> IngestScoresRequest | None:
     payloads = [
-        build_ingest_score_item(
+        build_ingest_scores_request(
             run_id=context["config"].run_id,
             experiment_id=context["experiment_id"],
             experiment_name=context["experiment_name"],
@@ -220,7 +220,7 @@ def _score_request(
             example_index=executed["data"].example_index,
             example_input=executed["data"].input,
             task_run=executed["data"],
-            evaluation_run=evaluation,
+            evaluation_runs=[evaluation],
         )
         for executed, evaluation in scored_runs
     ]
@@ -307,6 +307,9 @@ async def main() -> None:
     print("[1] Load configuration and prepare the knowledge base")
     load_dotenv(ENV_PATH)
     config = ElasticEvalsConfig.from_env()
+    if config.connector_id is None:
+        raise SystemExit("CONNECTOR_ID is required for this example: the Agent Builder task needs an LLM connector.")
+    connector_id: str = config.connector_id
     init_tracing(config.tracing)
 
     source = "GCS" if USE_GCP else "Hugging Face"
@@ -396,7 +399,7 @@ async def main() -> None:
     definitions = [by_name[name] for name in KIBANA_EVALUATOR_NAMES]
     validate_configs, evaluate_configs = _evaluator_configs(
         definitions,
-        config.evaluator_connector_id or config.connector_id,
+        config.evaluator_connector_id or connector_id,
     )
     for definition in definitions:
         print(f"  {definition.name} v{definition.version} ({definition.kind})")
@@ -416,7 +419,7 @@ async def main() -> None:
                 return await agent_builder_task(
                     sdk_example,
                     agent_builder_client,
-                    connector_id=config.connector_id,
+                    connector_id=connector_id,
                     agent_id=agent.id,
                 )
 
@@ -531,7 +534,7 @@ async def main() -> None:
         "experiment_name": EXPERIMENT_NAME,
         "dataset_id": dataset.id,
         "dataset_name": dataset.name,
-        "task_model": _task_model(config),
+        "task_model": _task_model(config, connector_id),
         "run_metadata": RunMetadata(
             total_repetitions=config.repetitions,
             git_branch=git.branch,
@@ -539,14 +542,14 @@ async def main() -> None:
         ),
         "environment": Environment(hostname=socket.gethostname()),
     }
-    connector_id = config.evaluator_connector_id or config.connector_id
+    evaluator_connector_id = config.evaluator_connector_id or connector_id
 
     print("[6] Create the experiment and ingest the scores")
     await _export_scores(
         scores_client,
         export_context,
         label="Kibana evaluator scores",
-        evaluator_model_id=connector_id,
+        evaluator_model_id=evaluator_connector_id,
         scored_runs=kibana_scores,
     )
     await _export_scores(

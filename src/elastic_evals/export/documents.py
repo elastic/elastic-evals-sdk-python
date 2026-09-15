@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from elastic_evals.api import (
@@ -25,7 +26,7 @@ from elastic_evals.api import (
 from elastic_evals.types import EvaluationRun, RunData
 
 
-def build_ingest_score_item(
+def build_ingest_scores_request(
     *,
     run_id: str,
     experiment_id: str,
@@ -41,11 +42,10 @@ def build_ingest_score_item(
     example_index: int,
     example_input: dict[str, Any] | None,
     task_run: RunData,
-    evaluation_run: EvaluationRun,
+    evaluation_runs: Sequence[EvaluationRun],
     experiment_name: str | None = None,
 ) -> IngestScoresRequest:
-    evaluator_result = evaluation_run.result
-
+    """Build one ingest request carrying every evaluator result for a single (example, repetition)."""
     git: IngestGit | None = None
     if run_metadata.git_branch or run_metadata.git_commit_sha:
         git = IngestGit(
@@ -62,6 +62,18 @@ def build_ingest_score_item(
         ci=ci.buildkite if ci else None,
     )
 
+    example = IngestExample(
+        id=example_id,
+        index=example_index,
+        dataset=Dataset(id=dataset_id, name=dataset_name),
+        input=example_input,
+    )
+    task = IngestTask(
+        repetition_index=task_run.repetition,
+        trace_id=task_run.trace_id,
+        output=task_run.output if isinstance(task_run.output, dict) else None,
+    )
+
     return IngestScoresRequest(
         experiment_id=experiment_id,
         experiment_name=experiment_name,
@@ -69,26 +81,19 @@ def build_ingest_score_item(
         evaluator_model=evaluator_model,
         metadata=metadata,
         scores=[
-            IngestScoreItem(
-                example=IngestExample(
-                    id=example_id,
-                    index=example_index,
-                    dataset=Dataset(id=dataset_id, name=dataset_name),
-                    input=example_input,
-                ),
-                task=IngestTask(
-                    repetition_index=task_run.repetition,
-                    trace_id=task_run.trace_id,
-                    output=task_run.output if isinstance(task_run.output, dict) else None,
-                ),
-                evaluator=IngestEvaluator(
-                    name=evaluation_run.name,
-                    score=evaluator_result.score if evaluator_result else None,
-                    label=evaluator_result.label if evaluator_result else None,
-                    explanation=evaluator_result.explanation if evaluator_result else None,
-                    metadata=evaluator_result.metadata if evaluator_result else None,
-                    trace_id=evaluation_run.trace_id,
-                ),
-            )
+            IngestScoreItem(example=example, task=task, evaluator=_build_ingest_evaluator(evaluation_run))
+            for evaluation_run in evaluation_runs
         ],
+    )
+
+
+def _build_ingest_evaluator(evaluation_run: EvaluationRun) -> IngestEvaluator:
+    evaluator_result = evaluation_run.result
+    return IngestEvaluator(
+        name=evaluation_run.name,
+        score=evaluator_result.score if evaluator_result else None,
+        label=evaluator_result.label if evaluator_result else None,
+        explanation=evaluator_result.explanation if evaluator_result else None,
+        metadata=evaluator_result.metadata if evaluator_result else None,
+        trace_id=evaluation_run.trace_id,
     )
