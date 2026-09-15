@@ -217,3 +217,62 @@ async def test_interaction_trace_id_is_popped_from_dict_output_before_storage() 
     assert score_store.results[0].task_run.trace_id == "trace-42"
     assert score_store.results[0].task_run.output == {"answer": "x"}
     assert evaluator.params[0].trace_id == "trace-42"
+
+
+class ExplodingEvaluator:
+    kind: Literal["LLM", "CODE"] = "CODE"
+    name = "exploding"
+
+    def __init__(self, error: BaseException) -> None:
+        self.error = error
+
+    async def evaluate(self, params: EvaluatorParams) -> EvaluationResult:
+        raise self.error
+
+
+@pytest.mark.asyncio
+async def test_raising_evaluator_is_recorded_as_error_and_run_continues() -> None:
+    evaluators = [
+        RecordingEvaluator("a", 0.1),
+        ExplodingEvaluator(RuntimeError("Kibana unavailable")),
+        RecordingEvaluator("c", 0.3),
+    ]
+    client = ElasticEvalsClient.local(_config())
+
+    ran = await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=evaluators)
+
+    store = client.score_store
+    assert isinstance(store, InMemoryScoreStore)
+    for batch in _sorted(store):
+        assert [run.name for run in batch.evaluation_runs] == ["a", "exploding", "c"]
+        error_run = batch.evaluation_runs[1]
+        assert error_run.result is not None
+        assert error_run.result.score is None
+        assert error_run.result.label == "error"
+        assert error_run.result.explanation == "RuntimeError: Kibana unavailable"
+    assert len(ran.evaluation_runs) == 6
+    assert await client.get_ran_experiments() == [ran]
+
+
+@pytest.mark.asyncio
+async def test_raising_evaluator_is_logged_at_error_level(caplog: pytest.LogCaptureFixture) -> None:
+    client = ElasticEvalsClient.local(_config())
+
+    with caplog.at_level("ERROR"):
+        await client.run_experiment(
+            dataset=_dataset(), task=_echo_task, evaluators=[ExplodingEvaluator(ValueError("bad params"))]
+        )
+
+    messages = [record.getMessage() for record in caplog.records if record.levelname == "ERROR"]
+    assert any("exploding" in message and "bad params" in message for message in messages)
+
+
+@pytest.mark.asyncio
+async def test_non_exception_base_exceptions_still_abort_the_run() -> None:
+    class Abort(BaseException):
+        pass
+
+    client = ElasticEvalsClient.local(_config())
+
+    with pytest.raises(Abort):
+        await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[ExplodingEvaluator(Abort())])
