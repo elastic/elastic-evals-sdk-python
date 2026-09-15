@@ -21,15 +21,20 @@ class InMemoryDatasetStore:
 
     async def resolve(self, dataset: EvaluationDataset) -> list[ExampleWithId]:
         namespace = uuid.UUID(compute_dataset_id(dataset.name))
-        return [
-            ExampleWithId(
-                id=str(uuid.uuid5(namespace, _content_key(example))),
-                input=example.input,
-                output=example.output,
-                metadata=example.metadata,
+        resolved: list[ExampleWithId] = []
+        first_index_by_id: dict[str, int] = {}
+        for index, example in enumerate(dataset.examples):
+            example_id = str(uuid.uuid5(namespace, _content_key(example)))
+            if example_id in first_index_by_id:
+                raise ValueError(
+                    f"Dataset {dataset.name!r} has a duplicate example: index {index} repeats index "
+                    f"{first_index_by_id[example_id]}. Kibana rejects duplicates on upload; remove one."
+                )
+            first_index_by_id[example_id] = index
+            resolved.append(
+                ExampleWithId(id=example_id, input=example.input, output=example.output, metadata=example.metadata)
             )
-            for example in dataset.examples
-        ]
+        return resolved
 
 
 def _content_key(example: Example) -> str:

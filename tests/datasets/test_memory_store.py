@@ -90,10 +90,10 @@ async def test_editing_one_example_changes_only_its_id() -> None:
 
 
 @pytest.mark.asyncio
-async def test_identical_examples_share_an_id() -> None:
+async def test_identical_examples_are_rejected() -> None:
     same = Example(input={"q": "hi"}, output="hello")
-    dataset = EvaluationDataset(name="dupes", description="", examples=[same, same.model_copy()])
+    other = Example(input={"q": "bye"})
+    dataset = EvaluationDataset(name="dupes", description="", examples=[same, other, same.model_copy()])
 
-    resolved = await InMemoryDatasetStore().resolve(dataset)
-
-    assert resolved[0].id == resolved[1].id
+    with pytest.raises(ValueError, match=r"duplicate.*index 2.*index 0"):
+        await InMemoryDatasetStore().resolve(dataset)

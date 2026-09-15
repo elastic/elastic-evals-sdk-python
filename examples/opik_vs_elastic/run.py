@@ -160,6 +160,9 @@ async def main() -> None:
     # (4) Setup elastic-evals-client:
     print("\nBuilding configurations from env vars and storing them into an ElasticEvalsConfig instance")
     config = ElasticEvalsConfig.from_env()
+    if config.connector_id is None:
+        raise SystemExit("CONNECTOR_ID is required for this example: the Agent Builder task needs an LLM connector.")
+    connector_id: str = config.connector_id
     init_tracing(config.tracing)
     print("\nInitializing ElasticEvalsClient with the config...")
     elastic_evals_client = ElasticEvalsClient(config)
@@ -220,7 +223,7 @@ async def main() -> None:
     print("\nGetting inference client from ElasticEvalsClient...")
     inference_client = elastic_evals_client.get_inference_client()  # to be used later for llm as a judge...
     evaluators_client = elastic_evals_client.get_evaluators_client()
-    evaluator_connector_id = config.evaluator_connector_id or config.connector_id
+    evaluator_connector_id = config.evaluator_connector_id or connector_id
     log = config.logger
 
     # (6) Setup agent builder:
@@ -291,7 +294,7 @@ async def main() -> None:
         return await agent_builder_task(
             example,
             ab_client,
-            connector_id=config.connector_id,
+            connector_id=connector_id,
             agent_id=agent.id,
         )
 
