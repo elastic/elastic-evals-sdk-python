@@ -192,7 +192,6 @@ Results are stored in `RanExperiment`.
 | `ELASTIC_EVALS_LOG_LEVEL`            | Log level                                                | No       | `INFO`                            |
 | `ELASTIC_EVALS_MODEL`                | JSON model metadata override                             | No       | -                                 |
 | `ELASTIC_EVALS_TRACING_ENABLED`      | Enable tracing (`true`/`false`)                          | No       | `false`                           |
-| `ELASTIC_EVALS_TRACING_EXPORTER`     | Tracing exporter (`otlp`, `console`, `none`)             | No       | `otlp`                            |
 | `ELASTIC_OTLP_ENDPOINT`              | OTLP/HTTP base endpoint                                  | No       | `http://localhost:4318`           |
 | `ELASTIC_OTLP_API_KEY`              | API key used for OTLP Authorization header               | No       | -                                 |
 | `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name                                     | No       | `elastic-evals`                   |
@@ -366,7 +365,6 @@ elastic-evals run --suite agent-builder \
   --connector-id "<connector-id>" \
   --evaluation-connector-id "<evaluator-connector-id>" \
   --kibana-url "http://elastic:changeme@localhost:5620" \
-  --tracing-exporter "otlp" \
   --tracing-endpoint "http://localhost:4320"
 ```
 
