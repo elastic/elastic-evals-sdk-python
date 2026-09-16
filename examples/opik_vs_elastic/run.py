@@ -30,7 +30,6 @@ from elastic_evals.integrations.agent_builder import (
     IndexSearchToolConfig,
     ToolSelection,
 )
-from elastic_evals.tracing import init_tracing
 from elastic_evals.types import (
     EvaluationDataset,
     EvaluationResult,
@@ -163,7 +162,6 @@ async def main() -> None:
     if config.connector_id is None:
         raise SystemExit("CONNECTOR_ID is required for this example: the Agent Builder task needs an LLM connector.")
     connector_id: str = config.connector_id
-    init_tracing(config.tracing)
     print("\nInitializing ElasticEvalsClient with the config...")
     elastic_evals_client = ElasticEvalsClient(config)
 

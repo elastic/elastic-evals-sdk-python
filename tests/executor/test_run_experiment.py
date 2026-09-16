@@ -10,6 +10,8 @@ import asyncio
 from typing import Any, Literal
 
 import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
 
 from elastic_evals.api import compute_dataset_id
 from elastic_evals.config import ElasticEvalsConfig
@@ -276,3 +278,18 @@ async def test_non_exception_base_exceptions_still_abort_the_run() -> None:
 
     with pytest.raises(Abort):
         await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[ExplodingEvaluator(Abort())])
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("reset_tracer_provider")
+async def test_run_starts_tracing_when_enabled_and_produces_trace_ids() -> None:
+    evaluator = RecordingEvaluator("a", 1.0)
+    client = ElasticEvalsClient.local(_config(tracing=TracingConfig(enabled=True, endpoint="http://localhost:9")))
+
+    await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[evaluator])
+    provider = trace.get_tracer_provider()
+    await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[evaluator])
+
+    assert isinstance(provider, TracerProvider)
+    assert trace.get_tracer_provider() is provider
+    assert all(params.trace_id for params in evaluator.params)

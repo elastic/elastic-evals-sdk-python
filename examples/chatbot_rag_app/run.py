@@ -16,7 +16,6 @@ from elastic_evals.evaluators.criteria import (
     create_criteria_evaluator,
 )
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.tracing import init_tracing
 from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
 from examples.chatbot_rag_app.datasets.workplace_questions import (
     workplace_questions_dataset,
@@ -51,7 +50,6 @@ def create_metadata_criteria_evaluator(*, inference_client: Any, log: Any) -> Ev
 
 async def main() -> None:
     config = ElasticEvalsConfig.from_env()
-    init_tracing(config.tracing)
 
     client = ElasticEvalsClient(config)
 

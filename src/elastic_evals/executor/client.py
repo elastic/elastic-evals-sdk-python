@@ -21,7 +21,7 @@ from elastic_evals.datasets import InMemoryDatasetStore, KibanaDatasetStore
 from elastic_evals.export import InMemoryScoreStore, KibanaScoreStore
 from elastic_evals.export.git_metadata import get_git_metadata
 from elastic_evals.inference import KibanaInferenceClient
-from elastic_evals.tracing import get_current_trace_id, with_evaluator_span, with_task_span
+from elastic_evals.tracing import get_current_trace_id, init_tracing, with_evaluator_span, with_task_span
 from elastic_evals.types import (
     DatasetStore,
     EvaluationDataset,
@@ -132,6 +132,7 @@ class ElasticEvalsClient:
         metadata: dict[str, Any] | None = None,
         concurrency: int | None = None,
     ) -> RanExperiment:
+        init_tracing(self.config.tracing)
         run_concurrency = max(1, concurrency or self.config.concurrency)
         semaphore = asyncio.Semaphore(run_concurrency)
         dataset_id = compute_dataset_id(dataset.name)

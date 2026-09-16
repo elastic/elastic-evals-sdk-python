@@ -82,6 +82,7 @@ import asyncio
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.executor import ElasticEvalsClient
+from elastic_evals.tracing import TracingConfig
 from elastic_evals.types import EvaluationDataset, EvaluationResult, EvaluatorParams, Example
 
 dataset = EvaluationDataset(
@@ -100,6 +101,8 @@ async def evaluator(params: EvaluatorParams) -> EvaluationResult:
 
 async def main() -> None:
     client = ElasticEvalsClient.local(ElasticEvalsConfig())
+    # No trace collector running? Disable tracing instead:
+    # client = ElasticEvalsClient.local(ElasticEvalsConfig(tracing=TracingConfig(enabled=False)))
     result = await client.run_experiment(
         dataset=dataset,
         task=task,
@@ -192,10 +195,14 @@ Results are stored in `RanExperiment`.
 | `ELASTIC_EVALS_LOG_LEVEL`            | Log level                                                | No       | `INFO`                            |
 | `ELASTIC_EVALS_MODEL`                | JSON model metadata override                             | No       | -                                 |
 | `ELASTIC_EVALS_TRACING_ENABLED`      | Enable tracing (`true`/`false`)                          | No       | `true`                            |
-| `ELASTIC_EVALS_TRACING_EXPORTER`     | Tracing exporter (`otlp`, `console`, `none`)             | No       | `otlp`                            |
 | `ELASTIC_OTLP_ENDPOINT`              | OTLP/HTTP base endpoint                                  | No       | `http://localhost:4318`           |
 | `ELASTIC_OTLP_API_KEY`              | API key used for OTLP Authorization header               | No       | -                                 |
 | `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name                                     | No       | `elastic-evals`                   |
+
+Tracing is on by default and starts automatically on the first `run_experiment` call. If no
+collector answers at `ELASTIC_OTLP_ENDPOINT`, the run fails before it starts; set
+`ELASTIC_EVALS_TRACING_ENABLED=false` to run without traces. Kibana's trace-based evaluators
+need tracing unless the task returns its own `_interaction_trace_id`.
 
 ## Evaluators reference
 
@@ -362,7 +369,6 @@ elastic-evals run --suite agent-builder \
   --connector-id "<connector-id>" \
   --evaluation-connector-id "<evaluator-connector-id>" \
   --kibana-url "http://elastic:changeme@localhost:5620" \
-  --tracing-exporter "otlp" \
   --tracing-endpoint "http://localhost:4320"
 ```
 

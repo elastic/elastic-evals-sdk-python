@@ -67,16 +67,7 @@ def _temporary_env(overrides: dict[str, str]) -> Iterator[None]:
 @click.option("--connector-id", help="Kibana connector ID for tasks.")
 @click.option("--evaluation-connector-id", help="Connector ID for evaluator LLMs.")
 @click.option("--log-level", help="Log level (DEBUG, INFO, WARNING, ERROR).")
-@click.option(
-    "--tracing-exporter",
-    default="otlp",
-    show_default=True,
-    help="Tracing exporter (otlp, console, none).",
-)
-@click.option(
-    "--tracing-endpoint",
-    help="Tracing endpoint (for otlp exporter).",
-)
+@click.option("--tracing-endpoint", help="OTLP/HTTP tracing endpoint.")
 @click.option("--dry-run", is_flag=True, help="Print command without executing.")
 def run_cmd(
     script: str | None,
@@ -89,7 +80,6 @@ def run_cmd(
     connector_id: str | None,
     evaluation_connector_id: str | None,
     log_level: str | None,
-    tracing_exporter: str | None,
     tracing_endpoint: str | None,
     dry_run: bool,
 ) -> None:
@@ -116,8 +106,6 @@ def run_cmd(
         overrides["EVALUATION_CONNECTOR_ID"] = evaluation_connector_id
     if log_level:
         overrides["ELASTIC_EVALS_LOG_LEVEL"] = log_level.upper()
-    if tracing_exporter:
-        overrides["ELASTIC_EVALS_TRACING_EXPORTER"] = tracing_exporter
     if tracing_endpoint:
         overrides["ELASTIC_OTLP_ENDPOINT"] = tracing_endpoint
 
