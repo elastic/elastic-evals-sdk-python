@@ -74,8 +74,7 @@ uv sync
 ### Run locally, no Kibana needed
 
 The fastest way to try the SDK is a fully in-memory run. Examples stay in memory,
-scores are collected in a list, and no connector, Kibana credentials or trace collector
-are required:
+scores are collected in a list, and no connector or Kibana credentials are required:
 
 ```python
 import asyncio
@@ -101,7 +100,9 @@ async def evaluator(params: EvaluatorParams) -> EvaluationResult:
     return EvaluationResult(score=1.0 if answer == expected else 0.0)
 
 async def main() -> None:
-    client = ElasticEvalsClient.local(ElasticEvalsConfig(tracing=TracingConfig(enabled=False)))
+    client = ElasticEvalsClient.local(ElasticEvalsConfig())
+    # No trace collector running? Disable tracing instead:
+    # client = ElasticEvalsClient.local(ElasticEvalsConfig(tracing=TracingConfig(enabled=False)))
     result = await client.run_experiment(
         dataset=dataset,
         task=task,
