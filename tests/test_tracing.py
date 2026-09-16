@@ -35,6 +35,18 @@ def test_init_tracing_disabled_installs_nothing() -> None:
     assert isinstance(trace.get_tracer_provider(), ProxyTracerProvider)
 
 
+def test_init_tracing_fails_before_the_run_when_no_collector_answers(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*_: object, **__: object) -> None:
+        raise ConnectionRefusedError("connection refused")
+
+    monkeypatch.setattr("elastic_evals.tracing.config.socket.create_connection", refuse)
+
+    with pytest.raises(ConnectionError, match=r"localhost:4318.*ELASTIC_EVALS_TRACING_ENABLED=false"):
+        init_tracing(TracingConfig(enabled=True))
+
+    assert isinstance(trace.get_tracer_provider(), ProxyTracerProvider)
+
+
 def test_init_tracing_installs_once_and_ignores_repeat_calls(caplog: pytest.LogCaptureFixture) -> None:
     config = TracingConfig(enabled=True, endpoint="http://localhost:9")
 

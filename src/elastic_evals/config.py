@@ -89,7 +89,7 @@ class ElasticEvalsConfig(BaseModel):
         tracing_enabled = _parse_bool(
             os.environ.get("ELASTIC_EVALS_TRACING_ENABLED"),
             name="ELASTIC_EVALS_TRACING_ENABLED",
-            default=False,
+            default=True,
         )
         tracing = TracingConfig(
             enabled=tracing_enabled,
