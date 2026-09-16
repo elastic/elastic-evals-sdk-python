@@ -191,11 +191,15 @@ Results are stored in `RanExperiment`.
 | `ELASTIC_EVALS_CONCURRENCY`          | Concurrency level                                        | No       | `5`                               |
 | `ELASTIC_EVALS_LOG_LEVEL`            | Log level                                                | No       | `INFO`                            |
 | `ELASTIC_EVALS_MODEL`                | JSON model metadata override                             | No       | -                                 |
-| `ELASTIC_EVALS_TRACING_ENABLED`      | Enable tracing (`true`/`false`)                          | No       | `true`                            |
+| `ELASTIC_EVALS_TRACING_ENABLED`      | Enable tracing (`true`/`false`)                          | No       | `false`                           |
 | `ELASTIC_EVALS_TRACING_EXPORTER`     | Tracing exporter (`otlp`, `console`, `none`)             | No       | `otlp`                            |
 | `ELASTIC_OTLP_ENDPOINT`              | OTLP/HTTP base endpoint                                  | No       | `http://localhost:4318`           |
 | `ELASTIC_OTLP_API_KEY`              | API key used for OTLP Authorization header               | No       | -                                 |
 | `ELASTIC_EVALS_TRACING_SERVICE_NAME` | Tracing service name                                     | No       | `elastic-evals`                   |
+
+Tracing is off by default and starts automatically on the first `run_experiment` call when
+`ELASTIC_EVALS_TRACING_ENABLED=true`. Kibana's trace-based evaluators need it unless the task
+returns its own `_interaction_trace_id`.
 
 ## Evaluators reference
 

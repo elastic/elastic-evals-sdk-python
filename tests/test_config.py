@@ -34,3 +34,13 @@ def test_from_env_still_reads_connector_id_when_set(monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("CONNECTOR_ID", "conn-1")
 
     assert ElasticEvalsConfig.from_env().connector_id == "conn-1"
+
+
+def test_tracing_is_off_unless_asked(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert ElasticEvalsConfig().tracing.enabled is False
+
+    monkeypatch.delenv("ELASTIC_EVALS_TRACING_ENABLED", raising=False)
+    assert ElasticEvalsConfig.from_env().tracing.enabled is False
+
+    monkeypatch.setenv("ELASTIC_EVALS_TRACING_ENABLED", "true")
+    assert ElasticEvalsConfig.from_env().tracing.enabled is True

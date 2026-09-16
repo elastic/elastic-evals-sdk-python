@@ -15,14 +15,12 @@ from elastic_evals.evaluators import (
     kibana_evaluators,
 )
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.tracing import init_tracing
 from examples.agent_builder.datasets.ambiguous_queries import ambiguous_queries_dataset
 from examples.agent_builder.tasks.agent_builder import agent_builder_task
 
 
 async def main() -> None:
     config = ElasticEvalsConfig.from_env()
-    init_tracing(config.tracing)
 
     client = ElasticEvalsClient(config)
 

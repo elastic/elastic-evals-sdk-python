@@ -44,7 +44,7 @@ from elastic_evals.integrations.agent_builder import (
     IndexSearchToolConfig,
     ToolSelection,
 )
-from elastic_evals.tracing import init_tracing, with_evaluator_span, with_task_span
+from elastic_evals.tracing import with_evaluator_span, with_task_span
 from elastic_evals.types import EvaluationResult, EvaluationRun, Evaluator, EvaluatorParams, Example, RunData
 from examples.opik_vs_elastic.helpers.data import load_wix_data, select_qa_examples
 from examples.opik_vs_elastic.helpers.helpers import (
@@ -310,7 +310,6 @@ async def main() -> None:
     if config.connector_id is None:
         raise SystemExit("CONNECTOR_ID is required for this example: the Agent Builder task needs an LLM connector.")
     connector_id: str = config.connector_id
-    init_tracing(config.tracing)
 
     source = "GCS" if USE_GCP else "Hugging Face"
     all_qa_wix, kb_wix = load_wix_data(use_gcp=USE_GCP)

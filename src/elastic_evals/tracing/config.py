@@ -13,16 +13,16 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.trace import NoOpTracerProvider
+from opentelemetry.trace import ProxyTracerProvider
 from pydantic import BaseModel
 
 from .spans import set_run_id
 
 
 class TracingConfig(BaseModel):
-    """Configuration for tracing with a single OTLP exporter."""
+    """Configuration for tracing with a single OTLP exporter. Off unless `enabled` is set."""
 
-    enabled: bool = True
+    enabled: bool = False
     endpoint: str = "http://localhost:4318"
     api_key: str | None = None
     service_name: str = "elastic-evals"
@@ -38,11 +38,13 @@ def _normalize_otlp_http_endpoint(endpoint: str) -> str:
 
 
 def init_tracing(config: TracingConfig) -> None:
-    """Initialize OpenTelemetry tracing with a single OTLP exporter."""
+    """Install the OTLP exporter if tracing is enabled and no tracer provider has been installed yet.
+
+    OpenTelemetry allows one global provider per process, so calling this again is a no-op.
+    """
     set_run_id(config.run_id)
 
-    if not config.enabled:
-        trace.set_tracer_provider(NoOpTracerProvider())
+    if not config.enabled or not isinstance(trace.get_tracer_provider(), ProxyTracerProvider):
         return
 
     resource = Resource.create({"service.name": config.service_name})
