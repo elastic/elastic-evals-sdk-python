@@ -79,6 +79,17 @@ def log_evaluator_complete(evaluator_name: str, example_index: int, repetition: 
     )
 
 
+def log_evaluator_error(evaluator_name: str, example_index: int, repetition: int, error: BaseException) -> None:
+    log.error(
+        '❌ Evaluator "%s" on run (exampleIndex=%s, repetition=%s) failed: %s: %s',
+        evaluator_name,
+        example_index,
+        repetition,
+        type(error).__name__,
+        error,
+    )
+
+
 def log_experiment_complete(experiment_id: str) -> None:
     log.info("✅ Experiment %s completed", experiment_id)
 

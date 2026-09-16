@@ -165,6 +165,10 @@ Evaluators implement `evaluate()` and return an `EvaluationResult`. They can be:
 - **LLM** (LLM-as-judge): correctness, groundedness, criteria
 - **CODE** (deterministic): custom evaluators via `SimpleEvaluator`
 
+If an evaluator raises, the run continues. The failure is logged at error level and recorded as an
+`EvaluationResult` with `score=None`, `label="error"` and the exception in `explanation`, so it
+shows up alongside the other scores instead of aborting the experiment.
+
 ### Experiment
 
 An experiment is a full evaluation run combining a dataset, task, and evaluators.
