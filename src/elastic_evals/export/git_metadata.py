@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from subprocess import PIPE, CalledProcessError, run
 
@@ -16,16 +17,18 @@ class GitMetadata:
     commit_sha: str | None
 
 
-def _try_git_command(command: str) -> str | None:
+def _try_git_command(path: str | os.PathLike[str] | None, *args: str) -> str | None:
+    command = ["git", *(["-C", os.fspath(path)] if path is not None else []), *args]
     try:
-        result = run(command, shell=True, check=True, stdout=PIPE, stderr=PIPE, text=True)
+        result = run(command, check=True, stdout=PIPE, stderr=PIPE, text=True)
         return result.stdout.strip() or None
-    except CalledProcessError:
+    except (CalledProcessError, OSError):
         return None
 
 
-def get_git_metadata() -> GitMetadata:
+def get_git_metadata(path: str | os.PathLike[str] | None = None) -> GitMetadata:
+    """Branch and commit of the checkout at ``path``, or of the working directory when omitted."""
     return GitMetadata(
-        branch=_try_git_command("git rev-parse --abbrev-ref HEAD"),
-        commit_sha=_try_git_command("git rev-parse HEAD"),
+        branch=_try_git_command(path, "rev-parse", "--abbrev-ref", "HEAD"),
+        commit_sha=_try_git_command(path, "rev-parse", "HEAD"),
     )
