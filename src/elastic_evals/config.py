@@ -14,6 +14,7 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, field_validator
 
+from elastic_evals.export.git_metadata import GitMetadata
 from elastic_evals.tracing import TracingConfig
 from elastic_evals.utils.logging import setup_logging
 
@@ -55,6 +56,9 @@ class ElasticEvalsConfig(BaseModel):
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     model: dict[str, Any] | None = None
+    # Git revision recorded with every score. Defaults to the working directory's checkout;
+    # set it when the system under test lives elsewhere (see `get_git_metadata(path)`).
+    git: GitMetadata | None = None
 
     @property
     def logger(self) -> logging.Logger:

@@ -204,6 +204,9 @@ collector answers at `ELASTIC_OTLP_ENDPOINT`, the run fails before it starts; se
 `ELASTIC_EVALS_TRACING_ENABLED=false` to run without traces. Kibana's trace-based evaluators
 need tracing unless the task returns its own `_interaction_trace_id`.
 
+Scores carry the git branch and commit of the working directory. When the system under test
+is another checkout, pass its revision: `ElasticEvalsConfig(git=get_git_metadata("/path/to/kibana"))`.
+
 ## Evaluators reference
 
 ### LLM evaluators
