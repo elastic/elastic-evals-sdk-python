@@ -17,7 +17,7 @@ from elastic_evals.api import compute_dataset_id
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.datasets import InMemoryDatasetStore
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.export import InMemoryScoreStore
+from elastic_evals.export import GitMetadata, InMemoryScoreStore
 from elastic_evals.tracing import TracingConfig
 from elastic_evals.types import (
     EvaluationDataset,
@@ -293,3 +293,15 @@ async def test_run_starts_tracing_when_enabled_and_produces_trace_ids() -> None:
     assert isinstance(provider, TracerProvider)
     assert trace.get_tracer_provider() is provider
     assert all(params.trace_id for params in evaluator.params)
+
+
+@pytest.mark.asyncio
+async def test_configured_git_revision_is_recorded_instead_of_the_working_directory() -> None:
+    client = ElasticEvalsClient.local(_config(git=GitMetadata(branch="main", commit_sha="a171e05")))
+
+    await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[RecordingEvaluator("a", 1.0)])
+
+    score_store = client.score_store
+    assert isinstance(score_store, InMemoryScoreStore)
+    context = score_store.results[0].context
+    assert (context.git_branch, context.git_commit_sha) == ("main", "a171e05")

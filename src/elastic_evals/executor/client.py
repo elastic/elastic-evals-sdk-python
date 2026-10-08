@@ -132,13 +132,19 @@ class ElasticEvalsClient:
         metadata: dict[str, Any] | None = None,
         concurrency: int | None = None,
     ) -> RanExperiment:
+        """Run `task` over every example of `dataset`, evaluate each output, and store the scores.
+
+        `metadata` is kept on the returned `RanExperiment` only; the Kibana scores API has no
+        field for it. The run-level facts Kibana does record come from `config`: `suite_id`,
+        `model`, `repetitions` and `git`.
+        """
         init_tracing(self.config.tracing)
         run_concurrency = max(1, concurrency or self.config.concurrency)
         semaphore = asyncio.Semaphore(run_concurrency)
         dataset_id = compute_dataset_id(dataset.name)
         experiment_id = str(uuid.uuid4())
         repetitions = self.config.repetitions
-        git_metadata = get_git_metadata()
+        git_metadata = self.config.git or get_git_metadata()
         context = RunContext(
             run_id=self.config.run_id,
             experiment_id=experiment_id,
