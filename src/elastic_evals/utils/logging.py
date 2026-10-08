@@ -17,12 +17,7 @@ _LOGGER_NAME = "elastic_evals"
 
 
 def setup_logging(level: str = "INFO") -> logging.Logger:
-    """Give the SDK's own logger a Rich handler; the root logger is left to the application.
-
-    The handler is attached once and the logger does not propagate, so SDK progress lines
-    show in the SDK's style while the application's logging configuration, and the
-    verbosity of other libraries, stay the application's business.
-    """
+    """Attach a Rich handler to the SDK's own logger, once; the root logger is left alone."""
     logger = logging.getLogger(_LOGGER_NAME)
     if not logger.handlers:
         handler = RichHandler(console=_CONSOLE, rich_tracebacks=True)
