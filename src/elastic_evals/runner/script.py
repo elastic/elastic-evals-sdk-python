@@ -16,6 +16,8 @@ from elastic_evals.utils.logging import setup_logging
 def main() -> None:
     setup_logging(os.environ.get("ELASTIC_EVALS_LOG_LEVEL", "INFO"))
     sys.argv = sys.argv[1:]
+    # Same as `python script.py`: the script's own directory comes first on sys.path.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(sys.argv[0])))
     runpy.run_path(sys.argv[0], run_name="__main__")
 
 

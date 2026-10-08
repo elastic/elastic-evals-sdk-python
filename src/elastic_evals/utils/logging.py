@@ -23,7 +23,7 @@ def setup_logging(level: str = "INFO") -> logging.Logger:
         handler = RichHandler(console=_CONSOLE, rich_tracebacks=True)
         handler.setFormatter(logging.Formatter("%(message)s", datefmt="[%X]"))
         logger.addHandler(handler)
-    logger.setLevel(level)
+    logger.setLevel(level.upper())
     return logger
 
 

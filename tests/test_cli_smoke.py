@@ -35,9 +35,11 @@ def test_cli_list_smoke() -> None:
 
 
 def test_cli_run_script_opts_the_child_process_into_logging(tmp_path: Path) -> None:
+    (tmp_path / "helper.py").write_text("VALUE = 1\n")
     script = tmp_path / "probe.py"
     script.write_text(
         "import logging\n"
+        "import helper  # a module next to the script, as under plain `python script.py`\n"
         "from rich.logging import RichHandler\n"
         "sdk = logging.getLogger('elastic_evals')\n"
         "ok = sdk.level == logging.DEBUG and any(isinstance(h, RichHandler) for h in sdk.handlers)\n"

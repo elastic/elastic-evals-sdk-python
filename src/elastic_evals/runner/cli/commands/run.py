@@ -18,7 +18,7 @@ import click  # type: ignore[import-not-found]
 from elastic_evals.runner.suites import get_suite
 from elastic_evals.utils.logging import setup_logging
 
-SCRIPT_RUNNER = "elastic_evals.runner.cli.script"
+SCRIPT_RUNNER = "elastic_evals.runner.script"
 
 
 def _format_env_prefix(overrides: dict[str, str]) -> str:

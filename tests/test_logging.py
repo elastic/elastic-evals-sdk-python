@@ -46,3 +46,7 @@ def test_setup_logging_attaches_one_rich_handler_to_the_sdk_logger(sdk_logger: l
 
     assert sum(isinstance(handler, RichHandler) for handler in sdk_logger.handlers) == 1
     assert sdk_logger.level == logging.DEBUG
+
+
+def test_setup_logging_accepts_a_lowercase_level(sdk_logger: logging.Logger) -> None:
+    assert setup_logging("debug").level == logging.DEBUG
