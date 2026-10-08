@@ -71,8 +71,6 @@ class ElasticEvalsClient:
     ) -> None:
         self.config = config
         self._logger = logger or log
-        if logger is None:
-            log.setLevel(config.log_level)
         self._experiments: list[RanExperiment] = []
         self._inference_client: KibanaInferenceClient | None = None
         self._evaluators_client: KibanaEvaluatorsClient | None = None
