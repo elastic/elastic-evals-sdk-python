@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 
 from elastic_evals.config import ElasticEvalsConfig
+from elastic_evals.export import GitMetadata
 
 
 def test_config_constructs_without_connector_or_kibana_credentials() -> None:
@@ -44,3 +45,11 @@ def test_tracing_is_on_unless_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setenv("ELASTIC_EVALS_TRACING_ENABLED", "false")
     assert ElasticEvalsConfig.from_env().tracing.enabled is False
+
+
+def test_git_revision_is_unset_unless_given() -> None:
+    assert ElasticEvalsConfig().git is None
+
+    config = ElasticEvalsConfig(git=GitMetadata(branch="main", commit_sha="a171e05"))
+
+    assert config.git == GitMetadata(branch="main", commit_sha="a171e05")

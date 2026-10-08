@@ -211,6 +211,9 @@ The SDK logs under `elastic_evals` and installs no handler. Call `setup_logging(
 Rich console output; the CLI does. An app that configures logging gets SDK lines through its
 own handlers.
 
+Scores carry the git branch and commit of the working directory. When the system under test
+is another checkout, pass its revision: `ElasticEvalsConfig(git=get_git_metadata("/path/to/kibana"))`.
+
 ## Evaluators reference
 
 ### LLM evaluators

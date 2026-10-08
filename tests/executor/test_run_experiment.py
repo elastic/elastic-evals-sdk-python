@@ -18,7 +18,7 @@ from elastic_evals.api import compute_dataset_id
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.datasets import InMemoryDatasetStore
 from elastic_evals.executor import ElasticEvalsClient
-from elastic_evals.export import InMemoryScoreStore
+from elastic_evals.export import GitMetadata, InMemoryScoreStore
 from elastic_evals.tracing import TracingConfig
 from elastic_evals.types import (
     EvaluationDataset,
@@ -305,3 +305,15 @@ async def test_progress_is_logged_through_the_given_logger(caplog: pytest.LogCap
 
     progress = [record for record in caplog.records if "Starting experiment" in record.getMessage()]
     assert [record.name for record in progress] == ["myapp.evals"]
+
+
+@pytest.mark.asyncio
+async def test_configured_git_revision_is_recorded_instead_of_the_working_directory() -> None:
+    client = ElasticEvalsClient.local(_config(git=GitMetadata(branch="main", commit_sha="a171e05")))
+
+    await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[RecordingEvaluator("a", 1.0)])
+
+    score_store = client.score_store
+    assert isinstance(score_store, InMemoryScoreStore)
+    context = score_store.results[0].context
+    assert (context.git_branch, context.git_commit_sha) == ("main", "a171e05")
