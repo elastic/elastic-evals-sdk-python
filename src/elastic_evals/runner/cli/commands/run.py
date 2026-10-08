@@ -16,6 +16,9 @@ from typing import Iterable, Iterator
 import click  # type: ignore[import-not-found]
 
 from elastic_evals.runner.suites import get_suite
+from elastic_evals.utils.logging import setup_logging
+
+SCRIPT_RUNNER = "elastic_evals.runner.cli.script"
 
 
 def _format_env_prefix(overrides: dict[str, str]) -> str:
@@ -109,12 +112,13 @@ def run_cmd(
     if tracing_endpoint:
         overrides["ELASTIC_OTLP_ENDPOINT"] = tracing_endpoint
 
+    level = overrides.get("ELASTIC_EVALS_LOG_LEVEL") or os.environ.get("ELASTIC_EVALS_LOG_LEVEL", "INFO")
     prefix = _format_env_prefix(overrides)
     if suite:
         preview = f"{prefix} elastic-evals run --suite {suite}".strip()
         click.echo(f"Running suite: {preview}")
     else:
-        preview = f"{prefix} {sys.executable} {script}".strip()
+        preview = f"{prefix} {sys.executable} -m {SCRIPT_RUNNER} {script}".strip()
         click.echo(f"Running: {preview}")
 
     if dry_run:
@@ -124,6 +128,7 @@ def run_cmd(
         suite_def = get_suite(suite)
         if not suite_def:
             raise click.ClickException(f'Unknown suite "{suite}".')
+        setup_logging(level)
         try:
             with _temporary_env(overrides):
                 suite_result = suite_def.run()
@@ -134,7 +139,7 @@ def run_cmd(
         return
 
     assert script is not None
-    command = [sys.executable, script]
+    command = [sys.executable, "-m", SCRIPT_RUNNER, script]
     env = os.environ.copy()
     _apply_overrides(overrides, env, overrides.keys())
     process_result = subprocess.run(command, env=env)

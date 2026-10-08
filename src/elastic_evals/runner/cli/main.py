@@ -18,14 +18,12 @@ except ImportError as exc:
     raise SystemExit(2) from exc
 
 from elastic_evals.runner.cli.commands import list_cmd, run
-from elastic_evals.utils.logging import setup_logging
 
 
 @click.group()
 @click.version_option(package_name="elastic-evals")
 def main() -> None:
     """elastic-evals - Python SDK for running offline LLM evaluations."""
-    setup_logging()
 
 
 main.add_command(run.run_cmd)
