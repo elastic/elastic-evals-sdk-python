@@ -27,8 +27,15 @@ def _try_git_command(path: str | os.PathLike[str] | None, *args: str) -> str | N
 
 
 def get_git_metadata(path: str | os.PathLike[str] | None = None) -> GitMetadata:
-    """Branch and commit of the checkout at ``path``, or of the working directory when omitted."""
-    return GitMetadata(
+    """Branch and commit of the checkout at ``path``, or of the working directory when omitted.
+
+    Outside a checkout the working directory yields no revision; an explicit ``path`` that
+    yields none raises, so a wrong path cannot silently drop the revision from every score.
+    """
+    metadata = GitMetadata(
         branch=_try_git_command(path, "rev-parse", "--abbrev-ref", "HEAD"),
         commit_sha=_try_git_command(path, "rev-parse", "HEAD"),
     )
+    if path is not None and metadata.commit_sha is None:
+        raise ValueError(f"{os.fspath(path)} is not a git checkout with a commit")
+    return metadata
