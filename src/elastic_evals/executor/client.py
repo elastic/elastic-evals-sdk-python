@@ -39,6 +39,7 @@ from elastic_evals.types import (
     TaskOutput,
 )
 from elastic_evals.utils.logging import (
+    log,
     log_evaluation_start,
     log_evaluator_complete,
     log_evaluator_error,
@@ -69,7 +70,9 @@ class ElasticEvalsClient:
         score_store: ScoreStore | None = None,
     ) -> None:
         self.config = config
-        self._logger = logger or config.logger
+        self._logger = logger or log
+        if logger is None:
+            log.setLevel(config.log_level)
         self._experiments: list[RanExperiment] = []
         self._inference_client: KibanaInferenceClient | None = None
         self._evaluators_client: KibanaEvaluatorsClient | None = None
@@ -160,12 +163,12 @@ class ElasticEvalsClient:
         runs: dict[str, RunData] = {}
         evaluation_runs: list[EvaluationRun] = []
 
-        log_experiment_start(self.config.run_id, dataset.name, len(evaluators), run_concurrency)
+        log_experiment_start(self._logger, self.config.run_id, dataset.name, len(evaluators), run_concurrency)
 
         async def run_example(example: ExampleWithId, example_index: int, repetition: int) -> None:
             async with semaphore:
                 run_key = f"{example_index}-{repetition}-{uuid.uuid4()}"
-                log_task_execution(dataset_id, example_index, repetition)
+                log_task_execution(self._logger, dataset_id, example_index, repetition)
 
                 async def task_runner() -> TaskOutput:
                     return await task(example)
@@ -185,7 +188,7 @@ class ElasticEvalsClient:
                     trace_id=task_trace_id,
                 )
 
-                log_evaluation_start(example_index, repetition, len(evaluators))
+                log_evaluation_start(self._logger, example_index, repetition, len(evaluators))
 
                 params = EvaluatorParams(
                     input=example.input,
@@ -197,14 +200,14 @@ class ElasticEvalsClient:
 
                 example_evaluation_runs: list[EvaluationRun] = []
                 for evaluator in evaluators:
-                    log_evaluator_start(evaluator.name, example_index, repetition)
+                    log_evaluator_start(self._logger, evaluator.name, example_index, repetition)
 
                     try:
                         result, eval_trace_id = await with_evaluator_span(
                             evaluator.name, {}, functools.partial(evaluator.evaluate, params)
                         )
                     except Exception as exc:
-                        log_evaluator_error(evaluator.name, example_index, repetition, exc)
+                        log_evaluator_error(self._logger, evaluator.name, example_index, repetition, exc)
                         result = EvaluationResult(score=None, label="error", explanation=f"{type(exc).__name__}: {exc}")
                         eval_trace_id = None
                     evaluation_run = EvaluationRun(
@@ -218,7 +221,7 @@ class ElasticEvalsClient:
                     )
                     evaluation_runs.append(evaluation_run)
                     example_evaluation_runs.append(evaluation_run)
-                    log_evaluator_complete(evaluator.name, example_index, repetition)
+                    log_evaluator_complete(self._logger, evaluator.name, example_index, repetition)
 
                 await self.score_store.write(
                     ExampleResult(
@@ -237,9 +240,9 @@ class ElasticEvalsClient:
                 jobs.append(run_example(example, example_index, rep))
 
         await asyncio.gather(*jobs)
-        log_experiment_complete(experiment_id)
+        log_experiment_complete(self._logger, experiment_id)
         if self._log_kibana_results_url:
-            log_results_url(self.config.kibana_url, self.config.run_id)
+            log_results_url(self._logger, self.config.kibana_url, self.config.run_id)
 
         experiment_metadata: dict[str, Any] = {"run_id": self.config.run_id}
         if metadata:

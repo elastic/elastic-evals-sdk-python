@@ -17,22 +17,23 @@ _LOGGER_NAME = "elastic_evals"
 
 
 def setup_logging(level: str = "INFO") -> logging.Logger:
-    """Attach a Rich handler to the SDK's own logger, once; the root logger is left alone."""
+    """Opt in to Rich console output for the SDK's logger. Importing the SDK installs nothing."""
     logger = logging.getLogger(_LOGGER_NAME)
-    if not logger.handlers:
+    if not any(isinstance(handler, RichHandler) for handler in logger.handlers):
         handler = RichHandler(console=_CONSOLE, rich_tracebacks=True)
         handler.setFormatter(logging.Formatter("%(message)s", datefmt="[%X]"))
         logger.addHandler(handler)
-        logger.propagate = False
     logger.setLevel(level)
     return logger
 
 
-log = setup_logging()
+log = logging.getLogger(_LOGGER_NAME)
 
 
-def log_experiment_start(run_id: str, dataset_name: str, evaluator_count: int, concurrency: int) -> None:
-    log.info(
+def log_experiment_start(
+    logger: logging.Logger, run_id: str, dataset_name: str, evaluator_count: int, concurrency: int
+) -> None:
+    logger.info(
         '🧪 Starting experiment "Run ID: %s - Dataset: %s" with %s evaluators and %s concurrent runs',
         run_id,
         dataset_name,
@@ -41,8 +42,8 @@ def log_experiment_start(run_id: str, dataset_name: str, evaluator_count: int, c
     )
 
 
-def log_task_execution(dataset_id: str, example_index: int, repetition: int) -> None:
-    log.info(
+def log_task_execution(logger: logging.Logger, dataset_id: str, example_index: int, repetition: int) -> None:
+    logger.info(
         '🔧 Running task "task" on dataset "%s" (exampleIndex=%s, repetition=%s)',
         dataset_id,
         example_index,
@@ -50,8 +51,8 @@ def log_task_execution(dataset_id: str, example_index: int, repetition: int) -> 
     )
 
 
-def log_evaluation_start(example_index: int, repetition: int, evaluator_count: int) -> None:
-    log.info(
+def log_evaluation_start(logger: logging.Logger, example_index: int, repetition: int, evaluator_count: int) -> None:
+    logger.info(
         "🧠 Evaluating run (exampleIndex=%s, repetition=%s) with %s evaluators",
         example_index,
         repetition,
@@ -59,8 +60,8 @@ def log_evaluation_start(example_index: int, repetition: int, evaluator_count: i
     )
 
 
-def log_evaluator_start(evaluator_name: str, example_index: int, repetition: int) -> None:
-    log.info(
+def log_evaluator_start(logger: logging.Logger, evaluator_name: str, example_index: int, repetition: int) -> None:
+    logger.info(
         '🧠 Evaluating run (exampleIndex=%s, repetition=%s) with evaluator "%s"',
         example_index,
         repetition,
@@ -68,8 +69,8 @@ def log_evaluator_start(evaluator_name: str, example_index: int, repetition: int
     )
 
 
-def log_evaluator_complete(evaluator_name: str, example_index: int, repetition: int) -> None:
-    log.info(
+def log_evaluator_complete(logger: logging.Logger, evaluator_name: str, example_index: int, repetition: int) -> None:
+    logger.info(
         '✅ Evaluator "%s" on run (exampleIndex=%s, repetition=%s) completed',
         evaluator_name,
         example_index,
@@ -77,8 +78,10 @@ def log_evaluator_complete(evaluator_name: str, example_index: int, repetition: 
     )
 
 
-def log_evaluator_error(evaluator_name: str, example_index: int, repetition: int, error: BaseException) -> None:
-    log.error(
+def log_evaluator_error(
+    logger: logging.Logger, evaluator_name: str, example_index: int, repetition: int, error: BaseException
+) -> None:
+    logger.error(
         '❌ Evaluator "%s" on run (exampleIndex=%s, repetition=%s) failed: %s: %s',
         evaluator_name,
         example_index,
@@ -88,8 +91,8 @@ def log_evaluator_error(evaluator_name: str, example_index: int, repetition: int
     )
 
 
-def log_experiment_complete(experiment_id: str) -> None:
-    log.info("✅ Experiment %s completed", experiment_id)
+def log_experiment_complete(logger: logging.Logger, experiment_id: str) -> None:
+    logger.info("✅ Experiment %s completed", experiment_id)
 
 
 def _strip_auth_from_url(url: str) -> str:
@@ -101,23 +104,23 @@ def _strip_auth_from_url(url: str) -> str:
     return url
 
 
-def log_results_url(kibana_url: str, run_id: str) -> None:
+def log_results_url(logger: logging.Logger, kibana_url: str, run_id: str) -> None:
     base = _strip_auth_from_url(kibana_url.rstrip("/"))
     results_url = f"{base}/app/management/ai/evals/runs/{run_id}"
-    log.info("📊 View results: %s", results_url)
+    logger.info("📊 View results: %s", results_url)
 
 
-def log_export_header() -> None:
+def log_export_header(logger: logging.Logger) -> None:
     _CONSOLE.print("═══ EXPORTING TO ELASTICSEARCH ═══", style="bold blue")
 
 
-def log_export_success() -> None:
-    log.info("✅ Evaluation scores exported successfully!")
+def log_export_success(logger: logging.Logger) -> None:
+    logger.info("✅ Evaluation scores exported successfully!")
 
 
-def log_export_query_hint(hostname: str, model_id: str | None, run_id: str) -> None:
+def log_export_query_hint(logger: logging.Logger, hostname: str, model_id: str | None, run_id: str) -> None:
     model_filter = f'task.model.id:"{model_id}"' if model_id else "task.model.id:*"
-    log.info(
+    logger.info(
         'You can query the data using: environment.hostname:"%s" AND %s AND run_id:"%s"',
         hostname,
         model_filter,
@@ -125,17 +128,17 @@ def log_export_query_hint(hostname: str, model_id: str | None, run_id: str) -> N
     )
 
 
-def log_no_scores_warning() -> None:
-    log.warning("No evaluation scores to export")
+def log_no_scores_warning(logger: logging.Logger) -> None:
+    logger.warning("No evaluation scores to export")
 
 
-def log_index_template_created() -> None:
-    log.debug("Created Elasticsearch index template for evaluation scores")
+def log_index_template_created(logger: logging.Logger) -> None:
+    logger.debug("Created Elasticsearch index template for evaluation scores")
 
 
-def log_scores_indexed(count: int) -> None:
-    log.debug("Successfully indexed %s evaluation scores", count)
+def log_scores_indexed(logger: logging.Logger, count: int) -> None:
+    logger.debug("Successfully indexed %s evaluation scores", count)
 
 
-def log_bulk_error(failed: int, total: int) -> None:
-    log.error("Bulk indexing had %s failed operations out of %s", failed, total)
+def log_bulk_error(logger: logging.Logger, failed: int, total: int) -> None:
+    logger.error("Bulk indexing had %s failed operations out of %s", failed, total)

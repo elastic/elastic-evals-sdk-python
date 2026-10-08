@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import logging
 import socket
 from collections.abc import Iterator
 
@@ -32,15 +31,3 @@ def reset_tracer_provider(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     finally:
         trace._TRACER_PROVIDER = saved_provider
         trace._TRACER_PROVIDER_SET_ONCE._done = saved_done
-
-
-@pytest.fixture(autouse=True)
-def _propagate_sdk_logs() -> Iterator[None]:
-    """Let `caplog`, which listens on the root logger, see SDK log lines during tests."""
-    logger = logging.getLogger("elastic_evals")
-    saved = logger.propagate
-    logger.propagate = True
-    try:
-        yield
-    finally:
-        logger.propagate = saved

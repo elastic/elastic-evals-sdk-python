@@ -184,7 +184,7 @@ async def test_runner_end_to_end(
     results_url_calls: list[tuple[str, str]] = []
     monkeypatch.setattr(
         "elastic_evals.executor.client.log_results_url",
-        lambda url, run_id: results_url_calls.append((url, run_id)),
+        lambda _logger, url, run_id: results_url_calls.append((url, run_id)),
     )
     dataset: EvaluationDataset[Example[dict[str, str], None, None]] = EvaluationDataset(
         name="tiny",

@@ -7,34 +7,42 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+from collections.abc import Iterator
 
+import pytest
 from rich.logging import RichHandler
 
 from elastic_evals.utils.logging import setup_logging
 
 
-def test_importing_the_sdk_configures_only_its_own_logger() -> None:
-    """Checked in a fresh interpreter: pytest itself attaches handlers and the conftest
-    fixture re-enables propagation so `caplog` can see SDK lines."""
+@pytest.fixture
+def sdk_logger() -> Iterator[logging.Logger]:
+    logger = logging.getLogger("elastic_evals")
+    saved = list(logger.handlers)
+    yield logger
+    for handler in logger.handlers[:]:
+        if handler not in saved:
+            logger.removeHandler(handler)
+
+
+def test_importing_the_sdk_installs_no_log_handlers() -> None:
+    """Checked in a fresh interpreter, because pytest attaches handlers of its own."""
     script = (
         "import logging\n"
-        "from rich.logging import RichHandler\n"
         "from elastic_evals.config import ElasticEvalsConfig\n"
+        "from elastic_evals.executor import ElasticEvalsClient\n"
         "root, sdk = logging.getLogger(), logging.getLogger('elastic_evals')\n"
-        "print(len(root.handlers), root.level == logging.WARNING, sdk.propagate,"
-        " sum(isinstance(h, RichHandler) for h in sdk.handlers))\n"
+        "print(len(root.handlers), len(sdk.handlers), sdk.propagate)\n"
     )
 
     output = subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True).stdout
 
-    assert output.split() == ["0", "True", "False", "1"]
+    assert output.split() == ["0", "0", "True"]
 
 
-def test_setup_logging_does_not_stack_handlers_when_called_again() -> None:
-    logger = setup_logging()
-    before = sum(isinstance(handler, RichHandler) for handler in logger.handlers)
-
+def test_setup_logging_attaches_one_rich_handler_to_the_sdk_logger(sdk_logger: logging.Logger) -> None:
+    setup_logging()
     setup_logging("DEBUG")
 
-    assert sum(isinstance(handler, RichHandler) for handler in logger.handlers) == before == 1
-    assert logger.level == logging.DEBUG
+    assert sum(isinstance(handler, RichHandler) for handler in sdk_logger.handlers) == 1
+    assert sdk_logger.level == logging.DEBUG
