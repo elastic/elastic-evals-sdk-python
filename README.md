@@ -84,6 +84,9 @@ from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.tracing import TracingConfig
 from elastic_evals.types import EvaluationDataset, EvaluationResult, EvaluatorParams, Example
+from elastic_evals.utils.logging import setup_logging
+
+setup_logging()
 
 dataset = EvaluationDataset(
     name="example-eval",
@@ -203,6 +206,10 @@ Tracing is on by default and starts automatically on the first `run_experiment` 
 collector answers at `ELASTIC_OTLP_ENDPOINT`, the run fails before it starts; set
 `ELASTIC_EVALS_TRACING_ENABLED=false` to run without traces. Kibana's trace-based evaluators
 need tracing unless the task returns its own `_interaction_trace_id`.
+
+The SDK logs under `elastic_evals` and installs no handler. Call `setup_logging()` for its
+Rich console output; the CLI does. An app that configures logging gets SDK lines through its
+own handlers.
 
 Scores carry the git branch and commit of the working directory. When the system under test
 is another checkout, pass its revision: `ElasticEvalsConfig(git=get_git_metadata("/path/to/kibana"))`.

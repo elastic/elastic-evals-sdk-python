@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Sequence
 from typing import Any
 
@@ -121,6 +122,7 @@ def test_agent_builder_error_is_kibana_api_error() -> None:
 async def test_create_tool_creates_missing_tool(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="elastic_evals")
     _RecordingAsyncClient.configure(
         [
             httpx.Response(404, json={"message": "not found"}),
@@ -158,6 +160,7 @@ async def test_create_tool_creates_missing_tool(
 async def test_create_tool_reuses_existing_tool_by_default(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="elastic_evals")
     _RecordingAsyncClient.configure(
         [
             httpx.Response(
@@ -480,6 +483,7 @@ async def test_create_tool_recovers_from_already_exists_race() -> None:
 async def test_create_agent_reuses_existing_agent_by_default(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="elastic_evals")
     _RecordingAsyncClient.configure(
         [
             httpx.Response(

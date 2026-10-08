@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from elastic_evals.api import KibanaEvaluatorsClient
@@ -64,3 +66,12 @@ def test_inference_client_prefers_evaluator_connector() -> None:
     client = ElasticEvalsClient(_config(connector_id="task", evaluator_connector_id="judge"))
 
     assert client.get_inference_client().connector_id == "judge"
+
+
+def test_creating_a_client_leaves_the_sdk_logger_level_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    sdk_logger = logging.getLogger("elastic_evals")
+    monkeypatch.setattr(sdk_logger, "level", logging.WARNING)
+
+    ElasticEvalsClient(ElasticEvalsConfig(tracing=TracingConfig(enabled=False)))
+
+    assert sdk_logger.level == logging.WARNING

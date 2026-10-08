@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any, Literal
 
 import pytest
@@ -293,6 +294,17 @@ async def test_run_starts_tracing_when_enabled_and_produces_trace_ids() -> None:
     assert isinstance(provider, TracerProvider)
     assert trace.get_tracer_provider() is provider
     assert all(params.trace_id for params in evaluator.params)
+
+
+@pytest.mark.asyncio
+async def test_progress_is_logged_through_the_given_logger(caplog: pytest.LogCaptureFixture) -> None:
+    client = ElasticEvalsClient.local(_config(), logger=logging.getLogger("myapp.evals"))
+
+    with caplog.at_level(logging.INFO):
+        await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[RecordingEvaluator("a", 1.0)])
+
+    progress = [record for record in caplog.records if "Starting experiment" in record.getMessage()]
+    assert [record.name for record in progress] == ["myapp.evals"]
 
 
 @pytest.mark.asyncio
