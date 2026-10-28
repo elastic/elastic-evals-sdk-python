@@ -13,6 +13,7 @@ import pytest
 
 from elastic_evals.api import (
     DATASET_UUID_NAMESPACE,
+    DatasetExample,
     DatasetSyncError,
     GetDatasetResponse,
     UpsertDatasetExamplePayload,
@@ -139,14 +140,16 @@ async def test_get_parses_dataset_response(monkeypatch: pytest.MonkeyPatch) -> N
         name="demo",
         description="desc",
         examples=[
-            {
-                "id": "example-1",
-                "input": {"a": 1},
-                "output": {"b": 2},
-                "metadata": {"k": "v"},
-                "created_at": "2026-01-01T00:00:00Z",
-                "updated_at": "2026-01-01T00:00:00Z",
-            }
+            DatasetExample.model_validate(
+                {
+                    "id": "example-1",
+                    "input": {"a": 1},
+                    "output": {"b": 2},
+                    "metadata": {"k": "v"},
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z",
+                }
+            )
         ],
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
