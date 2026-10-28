@@ -18,6 +18,7 @@ TTaskOutput = TypeVar("TTaskOutput")
 TExample = TypeVar("TExample", bound="Example")
 
 TaskOutput: TypeAlias = Any
+Direction: TypeAlias = Literal["maximize", "minimize", "neutral"]
 
 
 class _EvaluationScope:
@@ -61,6 +62,8 @@ class EvaluationResult(BaseModel):
     reasoning: str | None = None
     details: Any | None = None
     metadata: dict[str, Any] | None = None
+    # Overrides the evaluator's `direction` for this score.
+    direction: Direction | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +77,8 @@ class EvaluatorParams(Generic[TInput, TExpected, TMetadata, TTaskOutput]):
 
 
 class Evaluator(Protocol, Generic[TInput, TExpected, TMetadata, TTaskOutput]):
+    """An evaluator may also set `direction: Direction | None`; it is read when present."""
+
     name: str
     kind: Literal["LLM", "CODE"]
 
@@ -100,6 +105,8 @@ class EvaluationRun(BaseModel):
     experiment_run_id: str | None = None
     trace_id: str | None = None
     example_id: str | None = None
+    kind: Literal["LLM", "CODE"] | None = None
+    direction: Direction | None = None
 
 
 class RanExperiment(BaseModel):

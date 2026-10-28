@@ -619,3 +619,39 @@ def test_kibana_evaluators_validate_configs(
 
     with pytest.raises(ValueError, match=message):
         kibana_evaluators(configs, client=client)
+
+
+@pytest.mark.asyncio
+async def test_kibana_evaluators_take_the_direction_from_the_score_or_else_the_evaluator() -> None:
+    client = AsyncMock(spec=KibanaEvaluatorsClient)
+    client.evaluate.return_value = EvaluateResponse(
+        results=[
+            EvaluateResult(
+                status="ok",
+                evaluator=EvaluatorIdentity(name="latency", version="1.0.0", kind="code", direction="minimize"),
+                scores=[EvaluatorScore(name="latency", score=2.5)],
+            ),
+            EvaluateResult(
+                status="ok",
+                evaluator=EvaluatorIdentity(name="tool_calls", version="1.0.0", kind="code", direction="maximize"),
+                scores=[EvaluatorScore(name="tool_calls", score=3, direction="neutral")],
+            ),
+            EvaluateResult(
+                status="ok",
+                evaluator=EvaluatorIdentity(name="input_tokens", version="1.0.0", kind="code"),
+                scores=[EvaluatorScore(name="input_tokens", score=123)],
+            ),
+        ]
+    )
+    evaluators = kibana_evaluators(
+        [
+            KibanaEvaluatorConfig(name="latency", kind="CODE"),
+            KibanaEvaluatorConfig(name="tool_calls", kind="CODE"),
+            KibanaEvaluatorConfig(name="input_tokens", kind="CODE"),
+        ],
+        client=client,
+    )
+
+    results = await asyncio.gather(*(evaluator.evaluate(_params()) for evaluator in evaluators))
+
+    assert [result.direction for result in results] == ["minimize", "neutral", None]

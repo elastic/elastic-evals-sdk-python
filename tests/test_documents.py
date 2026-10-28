@@ -175,3 +175,21 @@ def test_build_ingest_scores_request_omits_evaluator_none_fields() -> None:
 
     assert task["output"] == {"nested": {"result": [1, 2, 3]}}
     assert example["input"] == {"nested": {"input": ["a", "b"]}}
+
+
+def test_build_ingest_scores_request_sends_direction_and_kind_when_known() -> None:
+    runs = [
+        EvaluationRun(name="duplicates", result=EvaluationResult(score=0.0), kind="CODE", direction="minimize"),
+        EvaluationRun(name="judge", result=EvaluationResult(score=1.0), kind="LLM"),
+        EvaluationRun(name="legacy", result=EvaluationResult(score=0.5)),
+    ]
+
+    payload = build_ingest_scores_request(**_common_kwargs(), evaluation_runs=runs)
+    evaluators = [item["evaluator"] for item in payload.model_dump(exclude_none=True)["scores"]]
+
+    assert evaluators[0]["kind"] == "code"
+    assert evaluators[0]["direction"] == "minimize"
+    assert evaluators[1]["kind"] == "llm"
+    assert "direction" not in evaluators[1]
+    assert "kind" not in evaluators[2]
+    assert "direction" not in evaluators[2]

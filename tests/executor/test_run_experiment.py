@@ -21,8 +21,10 @@ from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.export import GitMetadata, InMemoryScoreStore
 from elastic_evals.tracing import TracingConfig
 from elastic_evals.types import (
+    Direction,
     EvaluationDataset,
     EvaluationResult,
+    Evaluator,
     EvaluatorParams,
     Example,
     ExampleResult,
@@ -317,3 +319,33 @@ async def test_configured_git_revision_is_recorded_instead_of_the_working_direct
     assert isinstance(score_store, InMemoryScoreStore)
     context = score_store.results[0].context
     assert (context.git_branch, context.git_commit_sha) == ("main", "a171e05")
+
+
+class DirectedEvaluator:
+    kind: Literal["LLM", "CODE"] = "CODE"
+
+    def __init__(self, name: str, direction: Direction | None, result_direction: Direction | None = None) -> None:
+        self.name = name
+        self.direction = direction
+        self.result_direction = result_direction
+
+    async def evaluate(self, params: EvaluatorParams) -> EvaluationResult:
+        return EvaluationResult(score=0.0, direction=self.result_direction)
+
+
+@pytest.mark.asyncio
+async def test_evaluation_runs_carry_kind_and_direction_with_the_result_overriding_the_evaluator() -> None:
+    score_store = InMemoryScoreStore()
+    evaluators: list[Evaluator] = [
+        DirectedEvaluator("declared", "minimize"),
+        DirectedEvaluator("overridden", "maximize", result_direction="neutral"),
+        DirectedEvaluator("undeclared", None),
+        RecordingEvaluator("plain", 1.0),
+    ]
+    client = ElasticEvalsClient(_config(), dataset_store=InMemoryDatasetStore(), score_store=score_store)
+
+    await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=evaluators)
+
+    runs = _sorted(score_store)[0].evaluation_runs
+    assert [run.direction for run in runs] == ["minimize", "neutral", None, None]
+    assert {run.kind for run in runs} == {"CODE"}

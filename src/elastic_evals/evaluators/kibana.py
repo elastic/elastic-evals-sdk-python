@@ -143,7 +143,7 @@ def _trace_id(params: EvaluatorParams) -> str | None:
 def _error_result(message: str, *, result: EvaluateResult | None = None) -> EvaluationResult:
     metadata: dict[str, Any] = {}
     if result is not None:
-        metadata["evaluator"] = result.evaluator.model_dump()
+        metadata["evaluator"] = result.evaluator.model_dump(exclude_none=True)
         if result.error and result.error.code:
             metadata["error_code"] = result.error.code
     return EvaluationResult(
@@ -268,6 +268,7 @@ def kibana_evaluators(
                 label=score.label,
                 explanation=score.explanation,
                 metadata=score.metadata,
+                direction=score.direction or result.evaluator.direction,
             )
 
         return SimpleEvaluator(

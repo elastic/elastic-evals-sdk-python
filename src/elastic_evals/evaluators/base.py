@@ -9,13 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Literal
 
-from elastic_evals.types import EvaluationResult, EvaluatorParams
+from elastic_evals.types import Direction, EvaluationResult, EvaluatorParams
 
 
 @dataclass
 class SimpleEvaluator:
     name: str
     kind: Literal["LLM", "CODE"]
+    direction: Direction | None
     _evaluate: Callable[[EvaluatorParams], Awaitable[EvaluationResult]]
 
     def __init__(
@@ -23,9 +24,11 @@ class SimpleEvaluator:
         name: str,
         kind: Literal["LLM", "CODE"],
         evaluate: Callable[[EvaluatorParams], Awaitable[EvaluationResult]],
+        direction: Direction | None = None,
     ) -> None:
         self.name = name
         self.kind = kind
+        self.direction = direction
         self._evaluate = evaluate
 
     async def evaluate(self, params: EvaluatorParams) -> EvaluationResult:
