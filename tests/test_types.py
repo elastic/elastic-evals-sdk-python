@@ -8,9 +8,12 @@ import dataclasses
 
 import pytest
 
+from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.types import (
     DatasetStore,
     EvaluationDataset,
+    EvaluationResult,
+    EvaluatorParams,
     ExampleResult,
     ExampleWithId,
     RunContext,
@@ -70,3 +73,12 @@ def test_store_and_score_store_accept_any_object_with_matching_methods() -> None
 
     assert callable(store.resolve)
     assert callable(score_store.write)
+
+
+async def _no_score(params: EvaluatorParams) -> EvaluationResult:
+    return EvaluationResult()
+
+
+def test_an_unknown_kind_is_rejected_when_the_evaluator_is_created() -> None:
+    with pytest.raises(ValueError, match='kind must be "llm" or "code", got "CODE"'):
+        SimpleEvaluator(name="exact", kind="CODE", evaluate=_no_score)  # type: ignore[arg-type]

@@ -20,7 +20,7 @@ def create_tool_calls_evaluator(
     log: logging.Logger | None = None,
 ) -> Evaluator:
     return kibana_evaluators(
-        [KibanaEvaluatorConfig(name="tool_calls", kind="CODE")],
+        [KibanaEvaluatorConfig(name="tool_calls", kind="code")],
         client=client,
         instrumentation_profile=instrumentation_profile,
         log=log,

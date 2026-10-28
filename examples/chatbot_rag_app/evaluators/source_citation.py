@@ -51,4 +51,4 @@ def create_source_citation_evaluator() -> Evaluator:
             },
         )
 
-    return SimpleEvaluator(name="SourceCitation", kind="CODE", evaluate=evaluate)
+    return SimpleEvaluator(name="SourceCitation", kind="code", evaluate=evaluate)

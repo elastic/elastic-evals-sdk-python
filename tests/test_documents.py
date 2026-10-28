@@ -179,8 +179,8 @@ def test_build_ingest_scores_request_omits_evaluator_none_fields() -> None:
 
 def test_build_ingest_scores_request_sends_direction_and_kind_when_known() -> None:
     runs = [
-        EvaluationRun(name="duplicates", result=EvaluationResult(score=0.0), kind="CODE", direction="minimize"),
-        EvaluationRun(name="judge", result=EvaluationResult(score=1.0), kind="LLM"),
+        EvaluationRun(name="duplicates", result=EvaluationResult(score=0.0), kind="code", direction="minimize"),
+        EvaluationRun(name="judge", result=EvaluationResult(score=1.0), kind="llm"),
         EvaluationRun(name="legacy", result=EvaluationResult(score=0.5)),
     ]
 

@@ -20,7 +20,7 @@ def create_latency_evaluator(
     log: logging.Logger | None = None,
 ) -> Evaluator:
     return kibana_evaluators(
-        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        [KibanaEvaluatorConfig(name="latency", kind="code")],
         client=client,
         instrumentation_profile=instrumentation_profile,
         log=log,

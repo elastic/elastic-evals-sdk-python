@@ -33,7 +33,7 @@ from elastic_evals.types import (
 
 
 class RecordingEvaluator:
-    kind: Literal["LLM", "CODE"] = "CODE"
+    kind: Literal["llm", "code"] = "code"
 
     def __init__(self, name: str, score: float) -> None:
         self.name = name
@@ -225,7 +225,7 @@ async def test_interaction_trace_id_is_popped_from_dict_output_before_storage() 
 
 
 class ExplodingEvaluator:
-    kind: Literal["LLM", "CODE"] = "CODE"
+    kind: Literal["llm", "code"] = "code"
     name = "exploding"
 
     def __init__(self, error: BaseException) -> None:
@@ -322,7 +322,7 @@ async def test_configured_git_revision_is_recorded_instead_of_the_working_direct
 
 
 class DirectedEvaluator:
-    kind: Literal["LLM", "CODE"] = "CODE"
+    kind: Literal["llm", "code"] = "code"
 
     def __init__(self, name: str, direction: Direction | None, result_direction: Direction | None = None) -> None:
         self.name = name
@@ -348,4 +348,28 @@ async def test_evaluation_runs_carry_kind_and_direction_with_the_result_overridi
 
     runs = _sorted(score_store)[0].evaluation_runs
     assert [run.direction for run in runs] == ["minimize", "neutral", None, None]
-    assert {run.kind for run in runs} == {"CODE"}
+    assert {run.kind for run in runs} == {"code"}
+
+
+class UppercaseKindEvaluator:
+    name = "legacy"
+    kind: Literal["LLM", "CODE"] = "CODE"
+
+    async def evaluate(self, params: EvaluatorParams) -> EvaluationResult:
+        return EvaluationResult(score=1.0)
+
+
+@pytest.mark.asyncio
+async def test_an_evaluator_class_with_an_unknown_kind_fails_the_run_before_any_task() -> None:
+    task_calls: list[Example] = []
+
+    async def task(example: Example) -> str:
+        task_calls.append(example)
+        return "answer"
+
+    client = ElasticEvalsClient.local(_config())
+
+    with pytest.raises(ValueError, match='kind must be "llm" or "code", got "CODE"'):
+        await client.run_experiment(dataset=_dataset(), task=task, evaluators=[UppercaseKindEvaluator()])  # type: ignore[list-item]
+
+    assert task_calls == []

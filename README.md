@@ -109,7 +109,7 @@ async def main() -> None:
     result = await client.run_experiment(
         dataset=dataset,
         task=task,
-        evaluators=[SimpleEvaluator(name="ExactMatch", kind="CODE", evaluate=evaluator)],
+        evaluators=[SimpleEvaluator(name="ExactMatch", kind="code", evaluate=evaluator)],
     )
     for run in result.evaluation_runs:
         print(run.name, run.result.score if run.result else None)
@@ -139,7 +139,7 @@ async def main() -> None:
     result = await client.run_experiment(
         dataset=dataset,
         task=task,
-        evaluators=[SimpleEvaluator(name="ExactMatch", kind="CODE", evaluate=evaluator)],
+        evaluators=[SimpleEvaluator(name="ExactMatch", kind="code", evaluate=evaluator)],
     )
     print(f"Finished experiment {result.id} with {len(result.evaluation_runs)} runs")
 ```

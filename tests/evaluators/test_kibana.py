@@ -48,7 +48,7 @@ def _configs() -> list[KibanaEvaluatorConfig]:
     return [
         KibanaEvaluatorConfig(
             name="correctness",
-            kind="LLM",
+            kind="llm",
             connector_id="evaluator-connector",
             sub_scores=[
                 KibanaSubScore(key="factuality", evaluator_name="Factuality"),
@@ -58,16 +58,16 @@ def _configs() -> list[KibanaEvaluatorConfig]:
         ),
         KibanaEvaluatorConfig(
             name="groundedness",
-            kind="LLM",
+            kind="llm",
             connector_id="evaluator-connector",
             sub_scores=[
                 KibanaSubScore(key="groundedness", evaluator_name="Groundedness"),
             ],
         ),
-        KibanaEvaluatorConfig(name="latency", kind="CODE"),
-        KibanaEvaluatorConfig(name="input_tokens", kind="CODE"),
-        KibanaEvaluatorConfig(name="output_tokens", kind="CODE"),
-        KibanaEvaluatorConfig(name="tool_calls", kind="CODE"),
+        KibanaEvaluatorConfig(name="latency", kind="code"),
+        KibanaEvaluatorConfig(name="input_tokens", kind="code"),
+        KibanaEvaluatorConfig(name="output_tokens", kind="code"),
+        KibanaEvaluatorConfig(name="tool_calls", kind="code"),
     ]
 
 
@@ -361,7 +361,7 @@ async def test_kibana_evaluators_do_not_reuse_results_across_evaluations() -> No
     client = AsyncMock(spec=KibanaEvaluatorsClient)
     client.evaluate.return_value = _response()
     evaluator = kibana_evaluators(
-        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        [KibanaEvaluatorConfig(name="latency", kind="code")],
         client=client,
     )[0]
 
@@ -393,7 +393,7 @@ async def test_kibana_evaluators_do_not_cache_request_failures() -> None:
     client = AsyncMock(spec=KibanaEvaluatorsClient)
     client.evaluate.side_effect = [RuntimeError("Kibana unavailable"), _response()]
     evaluator = kibana_evaluators(
-        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        [KibanaEvaluatorConfig(name="latency", kind="code")],
         client=client,
     )[0]
     params = _params()
@@ -411,7 +411,7 @@ async def test_kibana_evaluators_fall_back_to_task_output_trace_id() -> None:
     client = AsyncMock(spec=KibanaEvaluatorsClient)
     client.evaluate.return_value = _response()
     evaluator = kibana_evaluators(
-        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        [KibanaEvaluatorConfig(name="latency", kind="code")],
         client=client,
     )[0]
     params = _params(trace_id="")
@@ -441,7 +441,7 @@ async def test_kibana_evaluators_use_first_score_without_sub_score_mapping() -> 
         ]
     )
     evaluator = kibana_evaluators(
-        [KibanaEvaluatorConfig(name="custom", kind="CODE")],
+        [KibanaEvaluatorConfig(name="custom", kind="code")],
         client=client,
     )[0]
 
@@ -469,10 +469,10 @@ async def test_kibana_evaluators_preserve_unavailable_and_partial_errors() -> No
     )
     evaluators = kibana_evaluators(
         [
-            KibanaEvaluatorConfig(name="latency", kind="CODE"),
+            KibanaEvaluatorConfig(name="latency", kind="code"),
             KibanaEvaluatorConfig(
                 name="groundedness",
-                kind="LLM",
+                kind="llm",
                 connector_id="evaluator-connector",
                 sub_scores=[KibanaSubScore(key="groundedness", evaluator_name="Groundedness")],
             ),
@@ -541,7 +541,7 @@ async def test_kibana_evaluators_report_invalid_responses(
     client = AsyncMock(spec=KibanaEvaluatorsClient)
     client.evaluate.return_value = response
     evaluator = kibana_evaluators(
-        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        [KibanaEvaluatorConfig(name="latency", kind="code")],
         client=client,
     )[0]
 
@@ -557,7 +557,7 @@ async def test_kibana_evaluators_propagate_request_errors() -> None:
     client = AsyncMock(spec=KibanaEvaluatorsClient)
     client.evaluate.side_effect = RuntimeError("Kibana unavailable")
     evaluator = kibana_evaluators(
-        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        [KibanaEvaluatorConfig(name="latency", kind="code")],
         client=client,
     )[0]
 
@@ -569,7 +569,7 @@ async def test_kibana_evaluators_propagate_request_errors() -> None:
 async def test_kibana_evaluators_do_not_request_without_trace_id() -> None:
     client = AsyncMock(spec=KibanaEvaluatorsClient)
     evaluators = kibana_evaluators(
-        [KibanaEvaluatorConfig(name="latency", kind="CODE")],
+        [KibanaEvaluatorConfig(name="latency", kind="code")],
         client=client,
     )
 
@@ -586,20 +586,20 @@ async def test_kibana_evaluators_do_not_request_without_trace_id() -> None:
         ([], "At least one Kibana evaluator is required"),
         (
             [
-                KibanaEvaluatorConfig(name="latency", kind="CODE"),
-                KibanaEvaluatorConfig(name="latency", kind="CODE"),
+                KibanaEvaluatorConfig(name="latency", kind="code"),
+                KibanaEvaluatorConfig(name="latency", kind="code"),
             ],
             'Duplicate Kibana evaluator "latency"',
         ),
         (
-            [KibanaEvaluatorConfig(name="correctness", kind="LLM")],
+            [KibanaEvaluatorConfig(name="correctness", kind="llm")],
             'connector_id is required for LLM evaluator "correctness"',
         ),
         (
             [
                 KibanaEvaluatorConfig(
                     name="correctness",
-                    kind="LLM",
+                    kind="llm",
                     connector_id="connector",
                     sub_scores=[
                         KibanaSubScore(key="factuality", evaluator_name="score"),
@@ -645,9 +645,9 @@ async def test_kibana_evaluators_take_the_direction_from_the_score_or_else_the_e
     )
     evaluators = kibana_evaluators(
         [
-            KibanaEvaluatorConfig(name="latency", kind="CODE"),
-            KibanaEvaluatorConfig(name="tool_calls", kind="CODE"),
-            KibanaEvaluatorConfig(name="input_tokens", kind="CODE"),
+            KibanaEvaluatorConfig(name="latency", kind="code"),
+            KibanaEvaluatorConfig(name="tool_calls", kind="code"),
+            KibanaEvaluatorConfig(name="input_tokens", kind="code"),
         ],
         client=client,
     )
@@ -655,3 +655,8 @@ async def test_kibana_evaluators_take_the_direction_from_the_score_or_else_the_e
     results = await asyncio.gather(*(evaluator.evaluate(_params()) for evaluator in evaluators))
 
     assert [result.direction for result in results] == ["minimize", "neutral", None]
+
+
+def test_kibana_evaluator_config_rejects_an_unknown_kind() -> None:
+    with pytest.raises(ValueError, match='kind must be "llm" or "code", got "LLM"'):
+        KibanaEvaluatorConfig(name="correctness", kind="LLM", connector_id="connector")  # type: ignore[arg-type]

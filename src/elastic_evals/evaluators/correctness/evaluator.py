@@ -34,7 +34,7 @@ _SUB_SCORES = (
 def _config(connector_id: str) -> KibanaEvaluatorConfig:
     return KibanaEvaluatorConfig(
         name="correctness",
-        kind="LLM",
+        kind="llm",
         connector_id=connector_id,
         sub_scores=_SUB_SCORES,
     )
@@ -118,7 +118,7 @@ def _analysis_evaluator(factuality: Evaluator) -> Evaluator:
 
     return SimpleEvaluator(
         name=QUALITATIVE_EVALUATOR_NAME,
-        kind="LLM",
+        kind="llm",
         evaluate=evaluate,
     )
 

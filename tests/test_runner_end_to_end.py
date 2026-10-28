@@ -219,7 +219,7 @@ async def test_runner_end_to_end(
         seen_eval_trace_ids.append(params.trace_id)
         return EvaluationResult(score=1.0)
 
-    evaluator = SimpleEvaluator(name="echo", kind="CODE", evaluate=evaluate)
+    evaluator = SimpleEvaluator(name="echo", kind="code", evaluate=evaluate)
     result = await client.run_experiment(
         dataset=dataset,
         task=task,
@@ -293,10 +293,10 @@ async def test_runner_executes_registered_trace_metrics_through_kibana(
     client = ElasticEvalsClient(config=config)
     evaluators = kibana_evaluators(
         [
-            KibanaEvaluatorConfig(name="latency", kind="CODE"),
-            KibanaEvaluatorConfig(name="input_tokens", kind="CODE"),
-            KibanaEvaluatorConfig(name="output_tokens", kind="CODE"),
-            KibanaEvaluatorConfig(name="tool_calls", kind="CODE"),
+            KibanaEvaluatorConfig(name="latency", kind="code"),
+            KibanaEvaluatorConfig(name="input_tokens", kind="code"),
+            KibanaEvaluatorConfig(name="output_tokens", kind="code"),
+            KibanaEvaluatorConfig(name="tool_calls", kind="code"),
         ],
         client=client.get_evaluators_client(),
     )

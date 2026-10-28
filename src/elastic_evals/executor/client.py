@@ -37,6 +37,7 @@ from elastic_evals.types import (
     RunData,
     ScoreStore,
     TaskOutput,
+    check_kind,
 )
 from elastic_evals.utils.logging import (
     log,
@@ -162,6 +163,8 @@ class ElasticEvalsClient:
             git_commit_sha=git_metadata.commit_sha,
         )
 
+        for evaluator in evaluators:
+            check_kind(evaluator.kind)
         examples = await self.dataset_store.resolve(dataset)
 
         runs: dict[str, RunData] = {}

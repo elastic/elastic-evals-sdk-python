@@ -23,10 +23,7 @@ from elastic_evals.api import (
     Model,
     RunMetadata,
 )
-from elastic_evals.api.evaluators_models import EvaluatorKind
 from elastic_evals.types import EvaluationRun, RunData
-
-_INGEST_KINDS: dict[str | None, EvaluatorKind] = {"LLM": "llm", "CODE": "code"}
 
 
 def build_ingest_scores_request(
@@ -99,6 +96,6 @@ def _build_ingest_evaluator(evaluation_run: EvaluationRun) -> IngestEvaluator:
         explanation=evaluator_result.explanation if evaluator_result else None,
         metadata=evaluator_result.metadata if evaluator_result else None,
         trace_id=evaluation_run.trace_id,
-        kind=_INGEST_KINDS.get(evaluation_run.kind),
+        kind=evaluation_run.kind,
         direction=evaluation_run.direction,
     )

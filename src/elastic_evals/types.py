@@ -19,6 +19,13 @@ TExample = TypeVar("TExample", bound="Example")
 
 TaskOutput: TypeAlias = Any
 Direction: TypeAlias = Literal["maximize", "minimize", "neutral"]
+EvaluatorKind: TypeAlias = Literal["llm", "code"]
+
+
+def check_kind(kind: EvaluatorKind) -> EvaluatorKind:
+    if kind not in ("llm", "code"):
+        raise ValueError(f'kind must be "llm" or "code", got "{kind}"')
+    return kind
 
 
 class _EvaluationScope:
@@ -80,7 +87,7 @@ class Evaluator(Protocol, Generic[TInput, TExpected, TMetadata, TTaskOutput]):
     """An evaluator may also set `direction: Direction | None`; it is read when present."""
 
     name: str
-    kind: Literal["LLM", "CODE"]
+    kind: EvaluatorKind
 
     async def evaluate(
         self, params: EvaluatorParams[TInput, TExpected, TMetadata, TTaskOutput]
@@ -105,7 +112,7 @@ class EvaluationRun(BaseModel):
     experiment_run_id: str | None = None
     trace_id: str | None = None
     example_id: str | None = None
-    kind: Literal["LLM", "CODE"] | None = None
+    kind: EvaluatorKind | None = None
     direction: Direction | None = None
 
 
