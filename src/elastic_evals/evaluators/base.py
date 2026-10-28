@@ -13,9 +13,8 @@ from elastic_evals.types import (
     Direction,
     EvaluationResult,
     EvaluatorKind,
-    EvaluatorKindInput,
     EvaluatorParams,
-    normalize_kind,
+    check_kind,
 )
 
 
@@ -29,12 +28,12 @@ class SimpleEvaluator:
     def __init__(
         self,
         name: str,
-        kind: EvaluatorKindInput,
+        kind: EvaluatorKind,
         evaluate: Callable[[EvaluatorParams], Awaitable[EvaluationResult]],
         direction: Direction | None = None,
     ) -> None:
         self.name = name
-        self.kind = normalize_kind(kind)
+        self.kind = check_kind(kind)
         self.direction = direction
         self._evaluate = evaluate
 

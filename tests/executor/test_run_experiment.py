@@ -360,12 +360,16 @@ class UppercaseKindEvaluator:
 
 
 @pytest.mark.asyncio
-async def test_uppercase_kind_on_an_evaluator_class_warns_once_per_run_and_is_recorded_lowercase() -> None:
-    score_store = InMemoryScoreStore()
-    client = ElasticEvalsClient(_config(), dataset_store=InMemoryDatasetStore(), score_store=score_store)
+async def test_an_evaluator_class_with_an_unknown_kind_fails_the_run_before_any_task() -> None:
+    task_calls: list[Example] = []
 
-    with pytest.warns(DeprecationWarning, match='kind="CODE" is deprecated') as caught:
-        await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[UppercaseKindEvaluator()])
+    async def task(example: Example) -> str:
+        task_calls.append(example)
+        return "answer"
 
-    assert len([w for w in caught if issubclass(w.category, DeprecationWarning)]) == 1
-    assert {run.kind for batch in score_store.results for run in batch.evaluation_runs} == {"code"}
+    client = ElasticEvalsClient.local(_config())
+
+    with pytest.raises(ValueError, match='kind must be "llm" or "code", got "CODE"'):
+        await client.run_experiment(dataset=_dataset(), task=task, evaluators=[UppercaseKindEvaluator()])  # type: ignore[list-item]
+
+    assert task_calls == []

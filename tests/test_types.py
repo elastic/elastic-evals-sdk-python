@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import dataclasses
-import warnings
 
 import pytest
 
@@ -80,16 +79,6 @@ async def _no_score(params: EvaluatorParams) -> EvaluationResult:
     return EvaluationResult()
 
 
-def test_uppercase_kind_is_lowercased_with_a_deprecation_warning() -> None:
-    with pytest.warns(DeprecationWarning, match='kind="CODE" is deprecated, use "code"'):
-        evaluator = SimpleEvaluator(name="exact", kind="CODE", evaluate=_no_score)
-
-    assert evaluator.kind == "code"
-
-
-def test_lowercase_kind_does_not_warn() -> None:
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        evaluator = SimpleEvaluator(name="exact", kind="llm", evaluate=_no_score)
-
-    assert evaluator.kind == "llm"
+def test_an_unknown_kind_is_rejected_when_the_evaluator_is_created() -> None:
+    with pytest.raises(ValueError, match='kind must be "llm" or "code", got "CODE"'):
+        SimpleEvaluator(name="exact", kind="CODE", evaluate=_no_score)  # type: ignore[arg-type]

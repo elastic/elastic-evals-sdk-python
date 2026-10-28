@@ -657,8 +657,6 @@ async def test_kibana_evaluators_take_the_direction_from_the_score_or_else_the_e
     assert [result.direction for result in results] == ["minimize", "neutral", None]
 
 
-def test_kibana_evaluator_config_lowercases_an_uppercase_kind_with_a_deprecation_warning() -> None:
-    with pytest.warns(DeprecationWarning, match='kind="LLM" is deprecated, use "llm"'):
-        config = KibanaEvaluatorConfig(name="correctness", kind="LLM", connector_id="connector")
-
-    assert config.kind == "llm"
+def test_kibana_evaluator_config_rejects_an_unknown_kind() -> None:
+    with pytest.raises(ValueError, match='kind must be "llm" or "code", got "LLM"'):
+        KibanaEvaluatorConfig(name="correctness", kind="LLM", connector_id="connector")  # type: ignore[arg-type]

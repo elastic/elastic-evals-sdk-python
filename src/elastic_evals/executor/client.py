@@ -37,7 +37,7 @@ from elastic_evals.types import (
     RunData,
     ScoreStore,
     TaskOutput,
-    normalize_kind,
+    check_kind,
 )
 from elastic_evals.utils.logging import (
     log,
@@ -163,7 +163,8 @@ class ElasticEvalsClient:
             git_commit_sha=git_metadata.commit_sha,
         )
 
-        kinds = [normalize_kind(evaluator.kind) for evaluator in evaluators]
+        for evaluator in evaluators:
+            check_kind(evaluator.kind)
         examples = await self.dataset_store.resolve(dataset)
 
         runs: dict[str, RunData] = {}
@@ -205,7 +206,7 @@ class ElasticEvalsClient:
                 )
 
                 example_evaluation_runs: list[EvaluationRun] = []
-                for evaluator, kind in zip(evaluators, kinds, strict=True):
+                for evaluator in evaluators:
                     log_evaluator_start(self._logger, evaluator.name, example_index, repetition)
 
                     try:
@@ -224,7 +225,7 @@ class ElasticEvalsClient:
                         experiment_run_id=run_key,
                         trace_id=eval_trace_id or get_current_trace_id(),
                         example_id=example.id,
-                        kind=kind,
+                        kind=evaluator.kind,
                         direction=result.direction or getattr(evaluator, "direction", None),
                     )
                     evaluation_runs.append(evaluation_run)

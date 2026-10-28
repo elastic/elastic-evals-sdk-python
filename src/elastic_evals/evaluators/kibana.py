@@ -25,7 +25,7 @@ from elastic_evals.api.evaluators_models import (
     InstrumentationProfile,
 )
 from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorKindInput, EvaluatorParams, normalize_kind
+from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorKind, EvaluatorParams, check_kind
 
 
 @dataclass(frozen=True)
@@ -37,13 +37,13 @@ class KibanaSubScore:
 @dataclass(frozen=True)
 class KibanaEvaluatorConfig:
     name: str
-    kind: EvaluatorKindInput
+    kind: EvaluatorKind
     version: str | None = None
     connector_id: str | None = None
     sub_scores: Sequence[KibanaSubScore] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "kind", normalize_kind(self.kind))
+        check_kind(self.kind)
 
 
 @dataclass(frozen=True)
