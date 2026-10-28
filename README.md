@@ -171,6 +171,9 @@ Evaluators implement `evaluate()` and return an `EvaluationResult`. They can be:
 - **LLM** (LLM-as-judge): correctness, groundedness, criteria
 - **CODE** (deterministic): custom evaluators via `SimpleEvaluator`
 
+Set `direction` (`maximize`, `minimize`, `neutral`) so Kibana's run comparison knows which way is
+better; without it, Kibana guesses from the name.
+
 If an evaluator raises, the run continues. The failure is logged at error level and recorded as an
 `EvaluationResult` with `score=None`, `label="error"` and the exception in `explanation`, so it
 shows up alongside the other scores instead of aborting the experiment.

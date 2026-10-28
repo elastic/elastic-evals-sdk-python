@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from elastic_evals.api.constants import MAX_EVALUATORS_PER_REQUEST
 
 EvaluatorKind = Literal["llm", "code"]
+Direction = Literal["maximize", "minimize", "neutral"]
 EvaluationMode = Literal["single-turn", "multi-turn"]
 InstrumentationProfile = Literal[
     "elastic-inference",
@@ -112,6 +113,7 @@ class EvaluatorIdentity(BaseModel):
     name: str
     version: str
     kind: EvaluatorKind
+    direction: Direction | None = None
 
 
 class EvaluatorScore(BaseModel):
@@ -120,6 +122,7 @@ class EvaluatorScore(BaseModel):
     label: str | None = None
     explanation: str | None = None
     metadata: dict[str, Any] | None = None
+    direction: Direction | None = None
 
 
 class EvaluatorError(BaseModel):

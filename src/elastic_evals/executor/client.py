@@ -222,6 +222,8 @@ class ElasticEvalsClient:
                         experiment_run_id=run_key,
                         trace_id=eval_trace_id or get_current_trace_id(),
                         example_id=example.id,
+                        kind=evaluator.kind,
+                        direction=result.direction or getattr(evaluator, "direction", None),
                     )
                     evaluation_runs.append(evaluation_run)
                     example_evaluation_runs.append(evaluation_run)

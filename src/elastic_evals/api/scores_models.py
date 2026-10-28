@@ -10,6 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from elastic_evals.api.evaluators_models import Direction, EvaluatorKind
+
 
 class Model(BaseModel):
     id: str
@@ -83,6 +85,8 @@ class IngestEvaluator(BaseModel):
     explanation: str | None = None
     metadata: dict[str, Any] | None = None
     trace_id: str | None = None
+    kind: EvaluatorKind | None = None
+    direction: Direction | None = None
 
 
 class IngestScoreItem(BaseModel):
