@@ -41,4 +41,4 @@ def create_latency_evaluator() -> Evaluator:
             },
         )
 
-    return SimpleEvaluator(name="Latency", kind="CODE", evaluate=evaluate)
+    return SimpleEvaluator(name="Latency", kind="code", evaluate=evaluate)

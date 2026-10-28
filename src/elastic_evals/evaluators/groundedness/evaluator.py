@@ -48,7 +48,7 @@ def create_groundedness_evaluators(
         [
             KibanaEvaluatorConfig(
                 name="groundedness",
-                kind="LLM",
+                kind="llm",
                 connector_id=connector_id,
                 sub_scores=(
                     KibanaSubScore(
@@ -107,4 +107,4 @@ def _analysis_evaluator(groundedness: Evaluator) -> Evaluator:
             metadata=result.metadata,
         )
 
-    return SimpleEvaluator(name=QUALITATIVE_EVALUATOR_NAME, kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(name=QUALITATIVE_EVALUATOR_NAME, kind="llm", evaluate=evaluate)

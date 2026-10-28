@@ -10,7 +10,7 @@ import asyncio
 import logging
 import weakref
 from dataclasses import dataclass
-from typing import Any, Literal, Sequence
+from typing import Any, Sequence
 
 from elastic_evals.api.constants import MAX_EVALUATORS_PER_REQUEST
 from elastic_evals.api.evaluators_client import KibanaEvaluatorsClient
@@ -25,7 +25,7 @@ from elastic_evals.api.evaluators_models import (
     InstrumentationProfile,
 )
 from elastic_evals.evaluators.base import SimpleEvaluator
-from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorParams
+from elastic_evals.types import EvaluationResult, Evaluator, EvaluatorKindInput, EvaluatorParams, normalize_kind
 
 
 @dataclass(frozen=True)
@@ -37,10 +37,13 @@ class KibanaSubScore:
 @dataclass(frozen=True)
 class KibanaEvaluatorConfig:
     name: str
-    kind: Literal["LLM", "CODE"]
+    kind: EvaluatorKindInput
     version: str | None = None
     connector_id: str | None = None
     sub_scores: Sequence[KibanaSubScore] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kind", normalize_kind(self.kind))
 
 
 @dataclass(frozen=True)
@@ -198,7 +201,7 @@ def _validate_configs(configs: Sequence[KibanaEvaluatorConfig]) -> None:
     for config in configs:
         if config.name in names:
             raise ValueError(f'Duplicate Kibana evaluator "{config.name}"')
-        if config.kind == "LLM" and not config.connector_id:
+        if config.kind == "llm" and not config.connector_id:
             raise ValueError(f'connector_id is required for LLM evaluator "{config.name}"')
         names.add(config.name)
 
@@ -237,7 +240,7 @@ def kibana_evaluators(
                 logger.error(message)
                 return _error_result(message)
 
-            if result.evaluator.kind.upper() != selector.config.kind:
+            if result.evaluator.kind != selector.config.kind:
                 message = f'Unexpected evaluator kind returned for "{selector.config.name}"'
                 logger.error(message)
                 return _error_result(message, result=result)

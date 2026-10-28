@@ -154,4 +154,4 @@ def create_criteria_evaluator(
             },
         )
 
-    return SimpleEvaluator(name="criteria", kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(name="criteria", kind="llm", evaluate=evaluate)

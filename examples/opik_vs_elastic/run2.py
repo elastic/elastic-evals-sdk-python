@@ -113,7 +113,7 @@ def create_document_recall_evaluator(*, tool_id: str) -> Evaluator:
             },
         )
 
-    return SimpleEvaluator(name="DocumentRecall", kind="CODE", evaluate=evaluate)
+    return SimpleEvaluator(name="DocumentRecall", kind="code", evaluate=evaluate)
 
 
 async def agent_builder_task(

@@ -33,7 +33,7 @@ from elastic_evals.types import (
 
 
 class RecordingEvaluator:
-    kind: Literal["LLM", "CODE"] = "CODE"
+    kind: Literal["llm", "code"] = "code"
 
     def __init__(self, name: str, score: float) -> None:
         self.name = name
@@ -225,7 +225,7 @@ async def test_interaction_trace_id_is_popped_from_dict_output_before_storage() 
 
 
 class ExplodingEvaluator:
-    kind: Literal["LLM", "CODE"] = "CODE"
+    kind: Literal["llm", "code"] = "code"
     name = "exploding"
 
     def __init__(self, error: BaseException) -> None:
@@ -322,7 +322,7 @@ async def test_configured_git_revision_is_recorded_instead_of_the_working_direct
 
 
 class DirectedEvaluator:
-    kind: Literal["LLM", "CODE"] = "CODE"
+    kind: Literal["llm", "code"] = "code"
 
     def __init__(self, name: str, direction: Direction | None, result_direction: Direction | None = None) -> None:
         self.name = name
@@ -348,4 +348,24 @@ async def test_evaluation_runs_carry_kind_and_direction_with_the_result_overridi
 
     runs = _sorted(score_store)[0].evaluation_runs
     assert [run.direction for run in runs] == ["minimize", "neutral", None, None]
-    assert {run.kind for run in runs} == {"CODE"}
+    assert {run.kind for run in runs} == {"code"}
+
+
+class UppercaseKindEvaluator:
+    name = "legacy"
+    kind: Literal["LLM", "CODE"] = "CODE"
+
+    async def evaluate(self, params: EvaluatorParams) -> EvaluationResult:
+        return EvaluationResult(score=1.0)
+
+
+@pytest.mark.asyncio
+async def test_uppercase_kind_on_an_evaluator_class_warns_once_per_run_and_is_recorded_lowercase() -> None:
+    score_store = InMemoryScoreStore()
+    client = ElasticEvalsClient(_config(), dataset_store=InMemoryDatasetStore(), score_store=score_store)
+
+    with pytest.warns(DeprecationWarning, match='kind="CODE" is deprecated') as caught:
+        await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[UppercaseKindEvaluator()])
+
+    assert len([w for w in caught if issubclass(w.category, DeprecationWarning)]) == 1
+    assert {run.kind for batch in score_store.results for run in batch.evaluation_runs} == {"code"}

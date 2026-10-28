@@ -35,7 +35,7 @@ async def main() -> None:
         [
             KibanaEvaluatorConfig(
                 name="correctness",
-                kind="LLM",
+                kind="llm",
                 connector_id=connector_id,
                 sub_scores=[
                     KibanaSubScore(key="factuality", evaluator_name="Factuality"),
@@ -45,7 +45,7 @@ async def main() -> None:
             ),
             KibanaEvaluatorConfig(
                 name="groundedness",
-                kind="LLM",
+                kind="llm",
                 connector_id=connector_id,
             ),
         ],

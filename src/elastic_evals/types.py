@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, Protocol, TypeAlias, TypeVar
 
@@ -19,6 +20,17 @@ TExample = TypeVar("TExample", bound="Example")
 
 TaskOutput: TypeAlias = Any
 Direction: TypeAlias = Literal["maximize", "minimize", "neutral"]
+EvaluatorKind: TypeAlias = Literal["llm", "code"]
+# Uppercase is deprecated and will be removed.
+EvaluatorKindInput: TypeAlias = Literal["llm", "code", "LLM", "CODE"]
+
+
+def normalize_kind(kind: EvaluatorKindInput) -> EvaluatorKind:
+    if kind == "LLM" or kind == "CODE":
+        lowered: EvaluatorKind = "llm" if kind == "LLM" else "code"
+        warnings.warn(f'kind="{kind}" is deprecated, use "{lowered}"', DeprecationWarning, stacklevel=3)
+        return lowered
+    return kind
 
 
 class _EvaluationScope:
@@ -80,7 +92,9 @@ class Evaluator(Protocol, Generic[TInput, TExpected, TMetadata, TTaskOutput]):
     """An evaluator may also set `direction: Direction | None`; it is read when present."""
 
     name: str
-    kind: Literal["LLM", "CODE"]
+
+    @property
+    def kind(self) -> EvaluatorKindInput: ...
 
     async def evaluate(
         self, params: EvaluatorParams[TInput, TExpected, TMetadata, TTaskOutput]
@@ -105,7 +119,7 @@ class EvaluationRun(BaseModel):
     experiment_run_id: str | None = None
     trace_id: str | None = None
     example_id: str | None = None
-    kind: Literal["LLM", "CODE"] | None = None
+    kind: EvaluatorKind | None = None
     direction: Direction | None = None
 
 

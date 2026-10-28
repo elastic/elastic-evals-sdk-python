@@ -45,7 +45,7 @@ def create_metadata_criteria_evaluator(*, inference_client: Any, log: Any) -> Ev
         )
         return await evaluator.evaluate(params)
 
-    return SimpleEvaluator(name="criteria", kind="LLM", evaluate=evaluate)
+    return SimpleEvaluator(name="criteria", kind="llm", evaluate=evaluate)
 
 
 async def main() -> None:

@@ -68,4 +68,4 @@ def create_tool_use_evaluator() -> Evaluator:
             },
         )
 
-    return SimpleEvaluator(name="ToolUse", kind="CODE", evaluate=evaluate)
+    return SimpleEvaluator(name="ToolUse", kind="code", evaluate=evaluate)

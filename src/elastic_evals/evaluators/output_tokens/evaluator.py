@@ -20,7 +20,7 @@ def create_output_tokens_evaluator(
     log: logging.Logger | None = None,
 ) -> Evaluator:
     return kibana_evaluators(
-        [KibanaEvaluatorConfig(name="output_tokens", kind="CODE")],
+        [KibanaEvaluatorConfig(name="output_tokens", kind="code")],
         client=client,
         instrumentation_profile=instrumentation_profile,
         log=log,

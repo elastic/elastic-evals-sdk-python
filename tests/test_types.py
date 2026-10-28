@@ -5,12 +5,16 @@
 from __future__ import annotations
 
 import dataclasses
+import warnings
 
 import pytest
 
+from elastic_evals.evaluators.base import SimpleEvaluator
 from elastic_evals.types import (
     DatasetStore,
     EvaluationDataset,
+    EvaluationResult,
+    EvaluatorParams,
     ExampleResult,
     ExampleWithId,
     RunContext,
@@ -70,3 +74,22 @@ def test_store_and_score_store_accept_any_object_with_matching_methods() -> None
 
     assert callable(store.resolve)
     assert callable(score_store.write)
+
+
+async def _no_score(params: EvaluatorParams) -> EvaluationResult:
+    return EvaluationResult()
+
+
+def test_uppercase_kind_is_lowercased_with_a_deprecation_warning() -> None:
+    with pytest.warns(DeprecationWarning, match='kind="CODE" is deprecated, use "code"'):
+        evaluator = SimpleEvaluator(name="exact", kind="CODE", evaluate=_no_score)
+
+    assert evaluator.kind == "code"
+
+
+def test_lowercase_kind_does_not_warn() -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        evaluator = SimpleEvaluator(name="exact", kind="llm", evaluate=_no_score)
+
+    assert evaluator.kind == "llm"
