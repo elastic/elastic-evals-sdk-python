@@ -16,7 +16,7 @@ repos:
         exclude: ^(\.venv|dist|build)/
       - id: mypy
         name: mypy
-        entry: uv run mypy src tests
+        entry: uv run --extra runner mypy src tests
         language: system
         types: [python]
         pass_filenames: false
