@@ -20,6 +20,7 @@ from elastic_evals.integrations.agent_builder import (
     AgentBuilderError,
     AgentConfiguration,
     ConverseResponse,
+    ConverseStep,
     CreateAgentRequest,
     CreateToolRequest,
     IndexSearchToolConfig,
@@ -323,11 +324,13 @@ async def test_call_converse_uses_default_agent_and_maps_response() -> None:
     assert result == ConverseResponse(
         message="The answer",
         steps=[
-            {
-                "type": "tool_call",
-                "tool_id": "search-documents",
-                "custom": "preserved",
-            }
+            ConverseStep.model_validate(
+                {
+                    "type": "tool_call",
+                    "tool_id": "search-documents",
+                    "custom": "preserved",
+                }
+            )
         ],
         structured_output={"answer": 42},
         conversation_id="8bcbde74-e394-4d5a-a702-5dd8e524dd64",

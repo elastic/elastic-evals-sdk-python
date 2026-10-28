@@ -237,7 +237,7 @@ class ExplodingEvaluator:
 
 @pytest.mark.asyncio
 async def test_raising_evaluator_is_recorded_as_error_and_run_continues() -> None:
-    evaluators = [
+    evaluators: list[Evaluator] = [
         RecordingEvaluator("a", 0.1),
         ExplodingEvaluator(RuntimeError("Kibana unavailable")),
         RecordingEvaluator("c", 0.3),

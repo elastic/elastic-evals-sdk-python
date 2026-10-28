@@ -379,6 +379,7 @@ async def test_kibana_evaluators_do_not_reuse_changed_reference_data() -> None:
     params = _params()
 
     await evaluators[0].evaluate(params)
+    assert params.expected is not None
     params.expected["expected"] = "Changed expected answer"
     await evaluators[1].evaluate(params)
 

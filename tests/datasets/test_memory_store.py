@@ -91,8 +91,8 @@ async def test_editing_one_example_changes_only_its_id() -> None:
 
 @pytest.mark.asyncio
 async def test_identical_examples_are_rejected() -> None:
-    same = Example(input={"q": "hi"}, output="hello")
-    other = Example(input={"q": "bye"})
+    same: Example = Example(input={"q": "hi"}, output="hello")
+    other: Example = Example(input={"q": "bye"})
     dataset = EvaluationDataset(name="dupes", description="", examples=[same, other, same.model_copy()])
 
     with pytest.raises(ValueError, match=r"duplicate.*index 2.*index 0"):

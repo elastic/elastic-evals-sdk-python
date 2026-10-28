@@ -11,7 +11,7 @@ import functools
 import logging
 import socket
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from elastic_evals.api import KibanaDatasetsClient, KibanaEvaluatorsClient, compute_dataset_id
@@ -129,7 +129,7 @@ class ElasticEvalsClient:
         *,
         dataset: EvaluationDataset,
         task: ExperimentTask,
-        evaluators: list[Evaluator],
+        evaluators: Sequence[Evaluator],
         experiment_name: str | None = None,
         metadata: dict[str, Any] | None = None,
         concurrency: int | None = None,

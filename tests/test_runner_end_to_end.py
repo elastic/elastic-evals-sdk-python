@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -63,7 +63,7 @@ class _TransportBackedAsyncClient:
 @pytest.fixture
 def fake_kibana(
     monkeypatch: pytest.MonkeyPatch,
-) -> AsyncIterator[dict[str, list[dict[str, Any]]]]:
+) -> Iterator[dict[str, list[dict[str, Any]]]]:
     requests: dict[str, list[dict[str, Any]]] = {
         "upsert": [],
         "get": [],
@@ -276,7 +276,7 @@ async def test_runner_end_to_end(
 async def test_runner_executes_registered_trace_metrics_through_kibana(
     fake_kibana: dict[str, list[dict[str, Any]]],
 ) -> None:
-    dataset = EvaluationDataset(
+    dataset: EvaluationDataset = EvaluationDataset(
         name="tiny",
         description="tiny dataset",
         examples=[Example(input={"q": "one"}), Example(input={"q": "two"})],
