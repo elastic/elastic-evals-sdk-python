@@ -19,6 +19,7 @@ from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.config import ElasticEvalsConfig
 from elastic_evals.datasets import InMemoryDatasetStore, KibanaDatasetStore
 from elastic_evals.export import InMemoryScoreStore, KibanaScoreStore
+from elastic_evals.export.ci_metadata import get_buildkite_metadata
 from elastic_evals.export.git_metadata import get_git_metadata
 from elastic_evals.inference import KibanaInferenceClient
 from elastic_evals.tracing import get_current_trace_id, init_tracing, with_evaluator_span, with_task_span
@@ -161,6 +162,7 @@ class ElasticEvalsClient:
             evaluator_connector_id=self.config.evaluator_connector_id,
             git_branch=git_metadata.branch,
             git_commit_sha=git_metadata.commit_sha,
+            ci=get_buildkite_metadata(),
         )
 
         for evaluator in evaluators:

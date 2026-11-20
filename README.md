@@ -216,6 +216,7 @@ own handlers.
 
 Scores carry the git branch and commit of the working directory. When the system under test
 is another checkout, pass its revision: `ElasticEvalsConfig(git=get_git_metadata("/path/to/kibana"))`.
+In a Buildkite job they also carry the build, read from the `BUILDKITE_*` variables.
 
 ## Evaluators reference
 

@@ -153,6 +153,7 @@ class RunContext:
     evaluator_connector_id: str | None = None
     git_branch: str | None = None
     git_commit_sha: str | None = None
+    ci: BuildkiteMetadata | None = None
 
 
 @dataclass(frozen=True)
