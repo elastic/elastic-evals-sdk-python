@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from elastic_evals.api.evaluators_models import Direction, EvaluatorKind
+from elastic_evals.types import BuildkiteMetadata
 
 
 class Model(BaseModel):
@@ -28,16 +29,6 @@ class RunMetadata(BaseModel):
 
 class Environment(BaseModel):
     hostname: str
-
-
-class BuildkiteMetadata(BaseModel):
-    build_id: str | None = None
-    job_id: str | None = None
-    build_url: str | None = None
-    pipeline_slug: str | None = None
-    pull_request: str | None = None
-    branch: str | None = None
-    commit: str | None = None
 
 
 class Ci(BaseModel):

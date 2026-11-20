@@ -12,7 +12,15 @@ import pytest
 from elastic_evals.api import IngestScoresRequest, IngestScoresResponse
 from elastic_evals.api.scores_client import KibanaScoresClient
 from elastic_evals.export import UNKNOWN_MODEL_ID, KibanaScoreStore
-from elastic_evals.types import EvaluationResult, EvaluationRun, ExampleResult, ExampleWithId, RunContext, RunData
+from elastic_evals.types import (
+    BuildkiteMetadata,
+    EvaluationResult,
+    EvaluationRun,
+    ExampleResult,
+    ExampleWithId,
+    RunContext,
+    RunData,
+)
 
 
 def _context(**overrides: Any) -> RunContext:
@@ -27,6 +35,7 @@ def _context(**overrides: Any) -> RunContext:
         "hostname": "worker",
         "git_branch": "main",
         "git_commit_sha": "abc",
+        "ci": BuildkiteMetadata(build_id="build-1"),
     }
     fields.update(overrides)
     return RunContext(**fields)
@@ -81,6 +90,7 @@ async def test_write_sends_all_evaluator_results_in_one_request() -> None:
     assert request.metadata.execution_id == "run-1"
     assert request.metadata.total_repetitions == 2
     assert request.metadata.git is not None and request.metadata.git.branch == "main"
+    assert request.metadata.ci == BuildkiteMetadata(build_id="build-1")
     assert request.scores[0].example.dataset.id == "dataset-1"
     assert request.scores[0].example.index == 3
     assert request.scores[0].task.repetition_index == 1

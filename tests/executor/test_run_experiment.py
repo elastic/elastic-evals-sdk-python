@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Literal
 
 import pytest
@@ -21,6 +22,7 @@ from elastic_evals.executor import ElasticEvalsClient
 from elastic_evals.export import GitMetadata, InMemoryScoreStore
 from elastic_evals.tracing import TracingConfig
 from elastic_evals.types import (
+    BuildkiteMetadata,
     Direction,
     EvaluationDataset,
     EvaluationResult,
@@ -319,6 +321,24 @@ async def test_configured_git_revision_is_recorded_instead_of_the_working_direct
     assert isinstance(score_store, InMemoryScoreStore)
     context = score_store.results[0].context
     assert (context.git_branch, context.git_commit_sha) == ("main", "a171e05")
+
+
+@pytest.mark.asyncio
+async def test_buildkite_build_is_recorded_only_inside_buildkite(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def recorded_build() -> BuildkiteMetadata | None:
+        client = ElasticEvalsClient.local(_config())
+        await client.run_experiment(dataset=_dataset(), task=_echo_task, evaluators=[RecordingEvaluator("a", 1.0)])
+        assert isinstance(client.score_store, InMemoryScoreStore)
+        return client.score_store.results[0].context.ci
+
+    for name in [name for name in os.environ if name.startswith("BUILDKITE_")]:
+        monkeypatch.delenv(name)
+    assert await recorded_build() is None
+
+    monkeypatch.setenv("BUILDKITE_BUILD_ID", "build-1")
+    monkeypatch.setenv("BUILDKITE_PIPELINE_SLUG", "evals-daily")
+    monkeypatch.setenv("BUILDKITE_PULL_REQUEST", "false")
+    assert await recorded_build() == BuildkiteMetadata(build_id="build-1", pipeline_slug="evals-daily")
 
 
 class DirectedEvaluator:
