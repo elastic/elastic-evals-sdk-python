@@ -126,6 +126,16 @@ class RanExperiment(BaseModel):
     experiment_metadata: dict[str, Any] | None = None
 
 
+class BuildkiteMetadata(BaseModel):
+    build_id: str | None = None
+    job_id: str | None = None
+    build_url: str | None = None
+    pipeline_slug: str | None = None
+    pull_request: str | None = None
+    branch: str | None = None
+    commit: str | None = None
+
+
 @dataclass(frozen=True)
 class RunContext:
     """Run-level facts shared by every example result of one `run_experiment` call."""
