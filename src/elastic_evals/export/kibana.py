@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from elastic_evals.api.scores_client import KibanaScoresClient
-from elastic_evals.api.scores_models import Environment, Model, RunMetadata
+from elastic_evals.api.scores_models import Ci, Environment, Model, RunMetadata
 from elastic_evals.export.documents import build_ingest_scores_request
 from elastic_evals.types import ExampleResult, RunContext
 
@@ -45,7 +45,7 @@ class KibanaScoreStore:
                 git_commit_sha=context.git_commit_sha,
             ),
             environment=Environment(hostname=context.hostname),
-            ci=None,
+            ci=Ci(buildkite=context.ci),
             dataset_id=context.dataset_id,
             dataset_name=context.dataset_name,
             example_id=result.example.id,
